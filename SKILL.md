@@ -1,26 +1,117 @@
 ---
 name: note-merge
 description: |
-  Clean, classify, merge, and deepen notes in the PARA+Zettelkasten knowledge base.
+  Clean, classify, merge, and deepen notes in the PARA+Zettelkasten Obsidian vault.
+  This skill operates on an Obsidian vault (~/KnowledgeBase/) and uses Obsidian-native
+  conventions: YAML frontmatter tags, [[wikilinks]] for internal references,
+  _index.md MOC (Map of Content) files, and status/#technique tag taxonomies.
   Use this skill when the user has random notes (chat exports, scratch files, scattered .md files,
   fleeting thoughts, meeting notes, paper drafts) that need to be cleaned up and absorbed into
-  the structured KnowledgeBase vault (~/KnowledgeBase/).
+  the structured KnowledgeBase vault.
   Also use this skill when the user asks to deepen or enrich existing concept notes —
   tracing each concept through source code to answer "why" questions at every layer.
   Covers: deduplication, formatting cleanup, concept extraction, PARA classification,
-  frontmatter tagging, cross-linking to existing notes, file placement,
-  and 5-layer concept deepening (motivation → mechanism → design rationale → evidence → system coupling).
+  frontmatter tagging, [[wikilink]] cross-linking, file placement, vault health auditing,
+  batch operations, semantic deduplication, and 5-layer concept deepening
+  (motivation → mechanism → design rationale → evidence → system coupling).
   Trigger on: 整理笔记, 清洗笔记, 合并笔记, 导入笔记, 深化笔记, 深挖, clean notes, merge notes,
-  import notes, deepen notes, 随笔, 零散笔记, 聊天记录, chat export, scratch notes, fleeting notes.
+  import notes, deepen notes, 随笔, 零散笔记, 聊天记录, chat export, scratch notes, fleeting notes,
+  vault setup, init vault, 初始化vault, batch deepen, batch format.
   Do NOT trigger on: creating new notes from scratch, editing existing notes in the vault,
   or general note-taking — use standard file editing tools for those.
-argument-hint: "[action] [target] — actions: merge, clean, import, deepen, audit, link-check, format, classify"
+argument-hint: "[action] [target] — actions: merge, clean, import, deepen, audit, link-check, format, classify, batch, track, resolve, init-vault"
 allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "Task", "AskUserQuestion"]
+vault: "~/KnowledgeBase"
+platform: "Obsidian"
 ---
 
-# Note Merge Skill
+# Note Merge Skill (Obsidian)
 
-Clean, classify, merge, and deepen notes in the PARA+Zettelkasten knowledge base at `~/KnowledgeBase/`.
+Clean, classify, merge, and deepen notes in a PARA+Zettelkasten **Obsidian vault** at `~/KnowledgeBase/`.
+
+**This skill is designed for Obsidian.** All conventions ([[wikilinks]], YAML frontmatter tags, `_index.md` MOC files, status/#technique tag taxonomy) are Obsidian-native. The vault directory is a standard Obsidian vault directory that can be opened directly with the Obsidian app.
+
+---
+
+## 0. OBSIDIAN VAULT SETUP (Prerequisite)
+
+Before using this skill, you need an initialized Obsidian vault at `~/KnowledgeBase/`.
+
+### 0.1 Quick setup with `init-vault`
+
+```
+init-vault [path]
+```
+
+Creates a fresh Obsidian vault with the full PARA+Zettelkasten skeleton. If no path given, defaults to `~/KnowledgeBase/`.
+
+**What it creates:**
+
+```
+~/KnowledgeBase/
+├── .obsidian/                 Obsidian vault config
+│   ├── app.json               newFileFolderPath: 0-Inbox/fleeting
+│   ├── app.json               attachmentFolderPath: _attachments
+│   ├── core-plugins.json      file-explorer, search, graph, backlink,
+│   │                          outgoing-link, tag-pane, page-preview,
+│   │                          daily-notes, templates, note-composer,
+│   │                          command-palette, markdown-importer,
+│   │                          outline, word-count, file-recovery
+│   └── appearance.json        default theme settings
+├── _MOCs/                     Global Map of Content indexes
+├── _templates/                Note templates (tpl-*.md)
+├── _attachments/              Images, PDFs, attachments
+├── 0-Inbox/
+│   ├── fleeting/              Uncategorized capture
+│   └── daily/                 Daily journal entries
+├── 1-Projects/                Active projects (each with _index.md)
+├── 2-Areas/                   Research areas (each with _index.md)
+├── 3-Resources/
+│   ├── Papers/                Paper reading notes by topic
+│   ├── Code-Tools/            Code snippets and tool references
+│   ├── Presentations/         Lecture/PPT learning notes
+│   └── Tutorials/             Tutorial and background learning
+└── 4-Archives/                Completed/archived projects
+```
+
+### 0.2 Recommended Obsidian community plugins (optional)
+
+These enhance the vault but are NOT required for skill functionality:
+
+| Plugin | Purpose |
+|--------|---------|
+| **Dataview** | Dynamic queries for vault metrics and tag aggregation |
+| **Templater** | Advanced template insertion with date/variable substitution |
+| **Tag Wrangler** | Batch rename/merge tags across the vault |
+| **Note Refactor** | Extract selections into new notes (useful during `merge`) |
+
+### 0.3 Loading template files
+
+When `init-vault` runs, all templates from `templates/` are copied to `~/KnowledgeBase/_templates/`. Templates included:
+
+- `tpl-concept.md` — Initial concept note (`## 定义` / `## 为什么重要`)
+- `tpl-concept-deepened.md` — 5-layer polished concept note
+- `tpl-paper-note.md` — Paper reading note with arxiv/author fields
+- `tpl-experiment.md` — Experiment log with config/results
+- `tpl-project-index.md` — Project _index.md MOC
+- `tpl-area-index.md` — Area _index.md MOC
+- `tpl-daily.md` — Daily journal entry
+- `tpl-codebase.md` — Codebase map
+- `tpl-stub.md` — Stub note for missing concepts
+- `tpl-chat-extract.md` — Chat export intermediate format
+
+### 0.4 Obsidian conventions enforced by this skill
+
+| Convention | Description |
+|------------|-------------|
+| `[[wikilinks]]` | Internal vault links — NEVER use `[text](path.md)` |
+| `_index.md` MOC | Every `1-Projects/<Proj>/` and `2-Areas/<Area>/` has one |
+| YAML frontmatter | Every .md file must have `tags:` and `created:` at minimum |
+| `#status/*` tags | `draft`, `stub`, `polished`, `active`, `toread`, `archived` |
+| `#type/*` tags | `concept`, `paper`, `experiment`, `moc`, `daily`, `codebase` |
+| `#area/*` tags | `quantization`, `diffusion`, `vision`, `systems` |
+| `#technique/*` tags | `ptq`, `qat`, `mxfp4`, `pruning`, `block-rotation` etc. |
+| Chinese filename | Chinese content → Chinese filename; English content → kebab-case |
 
 ---
 
@@ -90,6 +181,49 @@ Parse every `[[link]]` in `~/KnowledgeBase/` and verify the target file exists. 
 
 Add missing frontmatter fields, normalize headings, ensure `## 来源` section exists, update tags. Does not change the content body.
 
+### 1.9 `batch <sub-action>` — Bulk operations
+
+Run an action across many notes with optional checkpoint/recovery.
+
+| Sub-action | Description |
+|-----------|-------------|
+| `batch deepen <dir>` | Deepen all #status/stub or #status/draft notes in a directory |
+| `batch format <dir>` | Re-format all notes in a vault directory |
+| `batch classify <dir>` | Pre-classify all raw files and output a plan (read-only) |
+| `batch link-check` | Full-vault broken link scan |
+| `batch re-index` | Regenerate all _index.md MOC files |
+
+**Load:** `references/batch-operations.md` for checkpoint mechanism and sub-action details.
+
+### 1.10 `track <sub-action>` — Vault health metrics
+
+Maintain `~/KnowledgeBase/.vault-health.json` for trend tracking.
+
+| Sub-action | Description |
+|-----------|-------------|
+| `track scan` | Run a full vault scan, append to health log |
+| `track report` | Print the most recent scan summary |
+| `track diff` | Show delta between the last two scans |
+| `track trend` | ASCII trend chart of key metrics over time |
+
+**Load:** `references/batch-operations.md` (Section: Track Metrics).
+
+### 1.11 `resolve <conflict>` — Interactive conflict resolution
+
+When de-duplication finds conflicts, present a structured comparison:
+
+- Side-by-side metadata (title, tags, word count, status, last modified)
+- Auto-suggestion based on decision matrix (newer+longer → REPLACE, newer+shorter → MERGE, etc.)
+- User picks: `R`eplace / `M`erge / `S`kip / `K`eep-both / `C`ustom
+
+**Load:** `references/conflict-resolution.md` for decision matrix and comparison format.
+
+### 1.12 `init-vault [path]` — Create new Obsidian vault
+
+Initialize a fresh PARA+Zettelkasten Obsidian vault. See Section 0.1.
+
+**Load:** `references/vault-setup.md` for detailed directory structure and config files.
+
 ---
 
 ## 2. HARD RULES (Non-Negotiable)
@@ -104,9 +238,9 @@ These rules apply to all actions. Violation means the output is invalid.
 | 4 | **Preserve original content** meaning — do not hallucinate, embellish, or add unsourced claims. |
 | 5 | **Mark merged notes** with `source:` in frontmatter to trace provenance. |
 | 6 | **Every .md file must have frontmatter** — at minimum `tags:` and `created:` fields. |
-| 7 | **All internal links must be `[[wikilinks]]`** — never use `[text](path.md)` for vault-internal references. |
-| 8 | **Chinese content → Chinese filename** (not pinyin or English translation). English content → kebab-case. |
-| 9 | **Use `_index.md` MOC files** — every new note in `2-Areas/<Area>/` and `1-Projects/<Project>/` must be listed in the area/project MOC. |
+| 7 | **All internal links must be `[[wikilinks]]`** — Obsidian-native syntax, never use `[text](path.md)` for vault-internal references. |
+| 8 | **Chinese content → Chinese filename** (not pinyin or English translation). English content → kebab-case. Follow Obsidian naming conventions. |
+| 9 | **Use `_index.md` MOC files** — Obsidian convention: every new note in `2-Areas/<Area>/` and `1-Projects/<Project>/` must be listed in the area/project MOC. |
 | 10 | **Verify wikilinks before writing** — every `[[target]]` in a new note must have a target that exists, or a stub must be created. |
 | 11 | **Default status is `draft`** — never mark a note `polished` unless user explicitly requests or a `deepen` action completes with all quality gates passed. |
 | 12 | **Report, don't silently skip** — if a unit is skipped (duplicate, unclear classification), report why in Phase 7. |
@@ -153,11 +287,12 @@ For `deepen` actions, use the deepening-specific quality gate in `references/con
 | Situation | Action |
 |-----------|--------|
 | Classification ambiguous (multiple projects match) | Ask user to choose, listing the options |
-| Target directory doesn't exist | Create it following the KB structure conventions |
-| De-duplication finds multiple matches | Present all matches, let user choose merge/replace/skip |
+| Target directory doesn't exist | Create it following the PARA structure conventions |
+| De-duplication finds multiple matches | Use `resolve` action to present comparisons and ask user |
 | Wikilink target doesn't exist | Create a stub note with `#status/stub` |
 | Source file is empty or contains no extractable units | Report and skip, do not create empty notes |
 | Frontmatter parsing fails (malformed YAML) | Report the file path, skip, do not attempt repair |
+| Vault doesn't exist at ~/KnowledgeBase/ | Offer to run `init-vault` to create it |
 
 ---
 
@@ -169,5 +304,8 @@ Load these as needed based on the action:
 |--------|------------------|
 | `merge`, `import`, `clean`, `classify` | `references/merge-workflow.md` — phases, handlers, KB structure, tag system, examples |
 | `deepen` | `references/concept-deepening.md` — 5-layer framework, tracing rules, quality gate |
+| `batch`, `track` | `references/batch-operations.md` — checkpoint mechanism, sub-action details, track metrics schema |
+| `resolve` | `references/conflict-resolution.md` — decision matrix, comparison format, user interaction flow |
+| `init-vault` | `references/vault-setup.md` — directory skeleton, Obsidian config, template injection |
 
 **Base directory:** `~/.config/opencode/skills/note-merge/`

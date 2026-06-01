@@ -30,7 +30,74 @@ For **chat exports**: identify Q&A pairs, extract the answer/content, discard th
 
 ## Phase 3: CLASSIFY
 
-Assign each unit to the correct PARA location:
+Assign each unit to the correct PARA location. Classification uses three sources of signal, applied in priority order.
+
+### 3.1 Primary: frontmatter / explicit declaration
+
+If the source file has YAML frontmatter or explicit classification markers, use those first:
+
+| Signal | Classification |
+|--------|---------------|
+| `arxiv:` in frontmatter | `3-Resources/Papers/<topic>/` |
+| `project:` in frontmatter | `1-Projects/<Project>/` |
+| `status: polished/draft/stub` | Respect the status, place by content |
+| `## 论文笔记` heading | `3-Resources/Papers/<topic>/` |
+| `## 实验记录` heading | `1-Projects/<Project>/experiments/` |
+
+### 3.2 Secondary: keyword-to-PARA mapping
+
+| Keywords (Chinese) | Keywords (English) | Target directory |
+|---------------------|--------------------|-----------------|
+| 实验, 测试, 跑, 训练, 脚本, 配置, 结果, 精度, MSE, FID | experiment, test, run, train, script, config, result, accuracy, metric | `1-Projects/<Project>/experiments/` |
+| 方法, 算法, 实现, 架构, 管线 | method, algorithm, implementation, architecture, pipeline | `1-Projects/<Project>/methods/` |
+| 论文, arxiv, paper, 文献, 阅读, 作者, 发表 | paper, arxiv, reading, author, published, conference | `3-Resources/Papers/<topic>/` |
+| 概念, 定义, 什么是, 原理, 为什么, 机制, 原因 | concept, definition, what is, principle, why, mechanism | `2-Areas/<Area>/` |
+| 教程, tutorial, 入门, 学习笔记, 课程, 教学 | tutorial, introduction, course, learn, guide | `3-Resources/Tutorials/` |
+| 代码, 工具, 脚本, CLI, 命令, github, repo | code, tool, script, CLI, command, github, repo, repo_path | `3-Resources/Code-Tools/` |
+| 讲座, PPT, slides, 报告, 汇报, presentation | lecture, PPT, slides, talk, presentation | `3-Resources/Presentations/` |
+| 日记, 记录, 今天, 反思, todo, 计划, 想法 | diary, journal, today, reflection, todo, plan, idea | `0-Inbox/daily/` |
+| 随手记, 杂, 碎片, 临时, 待分类 | scratch, fleeting, temp, uncategorized, misc | `0-Inbox/fleeting/` |
+
+### 3.3 Tertiary: content structure heuristics
+
+When keywords are ambiguous or missing:
+
+| Heuristic | Classification | Confidence |
+|-----------|---------------|------------|
+| Content >200 lines | Paper note or tutorial (check for arxiv refs) | Medium |
+| Content <20 lines | Fleeting or stub | Medium |
+| Contains ``` code blocks AND no experiment results | Code-Tools | Medium |
+| Contains markdown tables with numeric metrics (MSE, FID, etc.) | Experiment | High |
+| Contains @author or arXiv:XXXX.XXXXX pattern | Paper | High |
+| Contains section headings like `## 定义`, `## 为什么重要` | Concept | High |
+| Contains timestamps and user/assistant markers | Chat export → trigger clean handler | High |
+| File begins with YAML frontmatter (---) | Use its `tags:` field for classification | High |
+
+### 3.4 Classification priority rules
+
+When multiple signals conflict, apply this priority:
+
+```
+1. User explicitly specifies target → ALWAYS follow user override
+2. Source file frontmatter (tags:, arxiv:, project:) → strongest automatic signal
+3. Content structure heuristics (table rows > 3, section headings present) → strong
+4. Keyword match count → more matching keywords = higher confidence
+5. Content length → long (>200 lines) favors paper/tutorial; short favors concept/stub
+6. If still ambiguous → ask user with top 2-3 suggestions
+```
+
+### 3.5 Multi-project disambiguation
+
+If a note mentions multiple projects (e.g., "compared TinyFusion and PTQ4DiT"):
+
+```
+1. Check which project has the most keyword matches
+2. Check which project the source file path is closest to (file paths)
+3. If tied → ask user: "This note references both [ProjA] and [ProjB]. Where should it go?"
+4. Alternative: place in the Area note (2-Areas/) and link to both projects
+```
+
+### 3.6 Unit-to-directory summary table
 
 | Unit type | Target directory |
 |-----------|-----------------|
@@ -44,12 +111,6 @@ Assign each unit to the correct PARA location:
 | Personal reflection/todo | `0-Inbox/daily/` or `2-Areas/Career/` |
 | Fleeting/uncategorized | `0-Inbox/fleeting/` |
 
-**Classification rules:**
-- If the note is about a specific active project → `1-Projects/<Project>/`
-- If the note is about a general research concept → `2-Areas/<Area>/`
-- If the note is reference material (paper, tutorial) → `3-Resources/`
-- If unclear → ask user
-
 ---
 
 ## Phase 4: DE-DUPLICATE
@@ -57,11 +118,12 @@ Assign each unit to the correct PARA location:
 For each unit, check if similar content already exists in the vault:
 1. Search for exact title match in `~/KnowledgeBase/`
 2. Search for semantic overlap (same paper title, same concept name)
-3. If match found → report to user, offer options:
-   - **Merge**: add new content to existing note
-   - **Replace**: overwrite existing with better version
-   - **Skip**: discard duplicate
-   - **Keep both**: save with a variant title
+3. If match found → use `resolve` action (see `references/conflict-resolution.md`) to present comparison and decision matrix:
+   - **Replace**: new note is significantly more complete (longer + more links)
+   - **Merge**: complementary content, combine sections
+   - **Skip**: existing note is already `polished`
+   - **Keep both**: same title but different topic/area → save with `_v2` suffix
+4. For batch operations: when user selects APPLY-TO-ALL-SIMILAR, auto-apply the same decision rule to subsequent similar conflicts
 
 ---
 
