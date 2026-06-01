@@ -4,8 +4,8 @@ description: |
   Organize raw notes into an Obsidian vault, deepen concept notes through source tracing,
   and diagnose vault health — all driven by a local config file (note-merge.json).
   Three user intents: ingest scattered notes, deepen stub concepts, check vault health.
-  Internal logic branches by source type (chat export / research report / casual note)
-  with different reference-gating rules for each.
+  Internal logic uses two independent checks: structure (how to extract content from a file)
+  and reference (whether the note has traceable external sources for deepening).
   Trigger on: 整理笔记, 清洗笔记, 合并笔记, 导入笔记, 深化笔记, 深挖, 检查vault,
   clean notes, merge notes, import notes, deepen notes, vault health, check vault,
   聊天记录, chat export, scratch notes, fleeting notes, 初始化vault, init vault,
@@ -61,55 +61,34 @@ ingest <files...>
 
 Take one or more source files and absorb their knowledge into the vault.
 
-### 1.1 Source type detection (first step)
+Processing is driven by two independent checks on the source file. They are not mutually exclusive — a file can match multiple signals in both dimensions.
 
-Read each source file. Classify it into one of three types _before_ any processing:
+### 1.1 Structure check — how to extract
 
-| Type | Signals | Info density | Has references? |
-|------|---------|-------------|-----------------|
-| **chat-export** | Timestamps, `**User**:` / `**Assistant**:` markers, Q&A structure | High — concept-dense, each Q&A usually targets one concept | Self-contained (conversation IS the reference) |
-| **research-report** | arxiv ID, repo paths, experiment names, section headings like `## 方法` / `## 结果` | Medium — structured but may need external context | Has citations that CAN be traced |
-| **casual-note** | Free-form thoughts, no clear structure, no citations, personal reflections | Low — ideas scattered, concepts vague | No references; must ask user for sources |
+Read the file. Detect which of these patterns are present. Apply each that matches:
 
-### 1.2 Processing fork by type
+| Pattern | Signal | Extraction strategy |
+|---------|--------|-------------------|
+| **Q&A** | `**User**:` / `**Assistant**:` markers, timestamps, conversational turn-taking | Identify Q&A boundaries → group adjacent pairs by topic → extract the answer content, discard questions and filler |
+| **Sections** | `## ` H2 headings structured as `方法` / `结果` / `实验` / `分析` / `Method` / `Results` etc. | Use H2 boundaries to split into units. Each H2 section = one candidate unit (merge adjacent short ones) |
+| **Experiment data** | Tables with numeric metrics (MSE, FID, accuracy, PSNR), config blocks (YAML/JSON), "baseline" vs "ours" comparison | Extract as experiment record. Keep the config + results table together as one unit |
+| **Code blocks** | Fenced code blocks (```) | Keep inline if illustrating a concept; extract to `3-Resources/Code-Tools/` only if it's a standalone reusable script |
+| **None of the above** | Free-form prose, no clear structure | Keep as one or a few units based on paragraph grouping. Do NOT force-split. Each unit becomes a stub/draft |
 
-**chat-export:**
+A file can match multiple patterns (e.g., Q&A with embedded code blocks, or sections containing experiment tables). Apply each matched strategy in order, deduplicating overlap.
 
-```
-1. Extract Q&A pairs → group by topic
-2. Strip conversational filler
-3. Classify each topic (match-first, see §1.3)
-4. Format + write to vault
-5. NO additional reference needed — conversation is self-contained
-6. Status: draft
-```
+### 1.2 Reference check — what can be traced
 
-**research-report:**
+After extraction, check whether the source file contains traceable external references. This determines what happens during `deepen` later, and whether to offer pulling additional material now.
 
-```
-1. Check for citations in content:
-   - arxiv ID present? → "这篇笔记引用了 arXiv:XXXX，需要我拉取原文吗？"
-   - repo path present? → "引用了 ~/xxx/repo，需要我读取代码吗？"
-   - experiment name present? → "提到了实验 xxx，需要我查找实验输出吗？"
-2. If user provides references → proceed with EXTRACT → CLASSIFY → WRITE
-3. If user declines / references inaccessible → write as draft, add a
-   ## 缺少的参考  section listing what's needed
-4. Status: draft (or polished ONLY if a full deepen passes quality gate)
-```
+| Signal | Example | Action during ingest |
+|--------|---------|---------------------|
+| **arxiv / DOI / URL** | `arXiv:2405.xxxxx`, `https://...`, `doi:...` | "这篇笔记引用了 [citation]，需要我拉取原文/元数据吗？" If user agrees, fetch and integrate. If not, annotate the note with the citation in `## 来源` |
+| **repo / file path** | `~/TinyFusion/mxfp4.py`, `quant_layer.py` | "引用了 [path]，需要我读取代码吗？" If user agrees, read and incorporate relevant snippets into the note body |
+| **experiment name** | `tiny_learned_mxfp4_experiment.py`, `run_ptq_ablation.sh` | "提到了实验 [name]，需要我查找实验输出吗？" If user agrees, search for the script and its output |
+| **none** | No arxiv, no path, no URL, no specific file reference | Skip reference pull. The note goes in as draft/stub. Deepen will be BLOCKED unless user later provides references |
 
-**casual-note:**
-
-```
-1. Extract ideas as atomic units
-2. Write each as a stub/draft note (use tpl-concept.md template)
-3. If the note attempts to describe a technical concept → DO NOT deepen
-   without user-provided reference. Reply:
-   "这篇笔记中的 ['概念名'] 需要补充参考材料才能深化。
-    可以提供一个论文链接、源码路径、或实验数据吗？"
-4. Exception: if a casual note contains [[wikilinks]] to existing polished notes,
-   cross-link them. But still do not mark the note itself as polished.
-5. Status: draft (NEVER polished from casual source alone)
-```
+A file can have references even if it's free-form (e.g., a casual note that mentions an arxiv ID). A file can lack references even if structured (e.g., lecture notes without citations). The two checks are independent.
 
 ### 1.3 Classification: match-first
 
@@ -182,17 +161,20 @@ deepen <concept-note>
 
 Expand a stub or draft concept note using the 5-layer framework. Load `references/concept-deepening.md` for full instructions.
 
-### 2.1 Reference threshold
+### 2.1 Reference threshold (REQUIRED before deepening)
 
-Before beginning, verify the note has sufficient backing:
+Check whether the note has traceable references. This is independent of how the note was originally ingested — the check is on the note's current state.
 
-| Note's current source | Rule |
-|----------------------|------|
-| Originated from chat-export | ✅ Allowed — conversation content is reference |
-| Has frontmatter `source:` pointing to a paper/code | ✅ Allowed |
-| Has [[wikilinks]] to polished notes | ✅ Allowed — those notes provide context |
-| Originated from casual-note, no citations, no code refs | ❌ Blocked — reply: "这篇笔记缺乏可追溯的参考材料，无法深化。请提供论文链接、源码路径或实验数据。" |
-| Has empty `## 来源` and no frontmatter `source:` | ❌ Blocked — same as above |
+| The note has... | Action |
+|----------------|--------|
+| Frontmatter `source:` pointing to a paper (arxiv/DOI/title) | ✅ Allow — paper content is traceable reference |
+| Frontmatter `source:` pointing to code (repo path / file path) | ✅ Allow — code is traceable reference |
+| References to specific experiment scripts or output logs | ✅ Allow — experiments are traceable evidence |
+| `[[wikilinks]]` to existing polished notes | ✅ Allow — those notes provide traceable context |
+| `## 来源` section with concrete, findable references | ✅ Allow |
+| None of the above — only the note's own text | ❌ Block — reply: "这篇笔记缺乏可追溯的参考材料（论文、代码、实验数据），无法深化。请提供至少一项外部来源。" |
+
+If the note has references that are mentioned but not yet accessible (arxiv ID not fetched, repo not read), fetch/read them first before beginning the 5-layer analysis.
 
 ### 2.2 Source tracing
 
@@ -259,7 +241,7 @@ Load `references/vault-setup.md` for the directory skeleton and Obsidian config 
 | 1 | Never delete original source files |
 | 2 | Never fabricate content — an accurate stub is better than a hallucinated note |
 | 3 | Always read `note-merge.json` before acting |
-| 4 | Casual notes CANNOT be deepened without user-provided references |
+| 4 | Notes without traceable references (paper, code, experiment) CANNOT be deepened — ask user to provide sources |
 | 5 | Classify by matching vault content first, keywords second |
 | 6 | Ask user when ambiguous — do not guess |
 | 7 | Every .md must have frontmatter with `tags:` and `created:` |

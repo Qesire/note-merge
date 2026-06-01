@@ -21,13 +21,17 @@ Boundary scenarios and their handling protocols. Load this when any action encou
 
 **Trigger:** User requests `deepen` on a note that has no traceable reference.
 
-| Note origin | Action |
-|------------|--------|
-| Originated from chat-export | ✅ Allow (conversation content is reference) |
-| Has `source:` in frontmatter pointing to paper/code | ✅ Allow |
-| Has [[wikilinks]] to polished notes | ✅ Allow (those notes provide context) |
-| Originated from casual-note with no citations | ❌ Block — reply: "这篇笔记源自随笔手记，缺乏可追溯的参考材料。无法深化。请提供论文链接、源码路径或实验数据。" |
-| Has empty `## 来源` and no frontmatter `source:` | ❌ Block — same as above |
+Check the note's current state for reference signals:
+
+| The note has... | Action |
+|----------------|--------|
+| Frontmatter `source:` pointing to paper (arxiv/DOI/title) or code (repo/file path) | ✅ Allow — the source is traceable |
+| References to specific experiment scripts or output logs | ✅ Allow — experiments are traceable evidence |
+| `[[wikilinks]]` to existing polished notes | ✅ Allow — those notes provide traceable context |
+| `## 来源` section with concrete, findable references | ✅ Allow |
+| None of the above | ❌ Block — reply: "这篇笔记缺乏可追溯的参考材料（论文、代码、实验数据）。无法深化。请提供至少一项外部来源。" |
+
+This check is on the note's CURRENT state, not its original source type. A note that was ingested from Q&A chat may have references embedded in its content. A note that was ingested from a "paper note" file may have lost its references in extraction. What matters is what's in the note now.
 
 ---
 
@@ -106,3 +110,18 @@ Decision:
 | `domains` is empty | Warn: "domains 为空，分类将仅依赖通用关键词。" |
 | `source_repos` entry not found on disk | Skip it, report: "仓库 {path} 不存在，已跳过" |
 | Malformed JSON | "note-merge.json 格式错误，无法解析。请检查 JSON 语法。" |
+
+---
+
+## 9. Structure+Reference Ambiguity
+
+**Trigger:** The source file has conflicting structural signals (e.g., Q&A markers inside what looks like a report document) or the reference check finds a URL in an unexpected context.
+
+```
+- Structure ambiguity: apply BOTH matching strategies, deduplicate overlapping units
+  Example: a chat export with section headings → extract Q&A AND split by sections.
+  If both produce the same unit, keep the richer version.
+- Reference ambiguity: perform the reference check independently of structure.
+  A casual-looking note with an arxiv link still gets the offer to pull the paper.
+  A well-structured report with no references still gets deepen-blocked.
+```

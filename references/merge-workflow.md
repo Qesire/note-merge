@@ -12,74 +12,103 @@ Extract `domains[]` — this drives the classification keyword table and AREA di
 
 ---
 
-## Phase 1: INVENTORY — Source Type Detection
+## Phase 1: INVENTORY — Structure & Reference Check
 
-Read each source file. Determine its type. The type determines everything downstream.
+Read each source file. Run two independent checks. They answer different questions and both must be performed.
 
-### Detection Signals
+### 1.1 Structure check — how to extract
 
-| Signal | → Type |
-|--------|--------|
-| Contains `**User**:`, `**Assistant**:`, timestamps, Q&A markers | **chat-export** |
-| Contains arxiv ID (`arXiv:\d{4}\.\d+`), repo paths (`~/...`), experiment names, structured sections (`## 方法`, `## 结果`, `## Experiment`) | **research-report** |
-| None of the above; free-form text, personal reflections, scattered ideas | **casual-note** |
+Detect which organizational patterns are present in the file. A file can match zero, one, or multiple patterns.
 
-### Ambiguous cases
+| Pattern | Signal | Extraction strategy |
+|---------|--------|-------------------|
+| **Q&A** | `**User**:` / `**Assistant**:` markers, timestamps, conversational turn-taking | Identify Q&A boundaries → group adjacent pairs by topic → extract answer content, discard questions and filler |
+| **Sections** | `## ` H2 headings, especially structured ones like `方法`, `结果`, `实验`, `Method`, `Results`, `Experiment` | Split at H2 boundaries. Each H2 section → one candidate unit. Merge adjacent short (<50 word) sections on the same topic |
+| **Experiment data** | Tables with numeric metrics (MSE, FID, PSNR, accuracy, etc.), config blocks (YAML/JSON), "baseline vs ours" comparison | Keep as experiment record. Config + results table stay together as one unit |
+| **Code blocks** | Fenced code blocks (```) | Keep inline if illustrating a concept. Extract standalone to `3-Resources/Code-Tools/` only if it's a reusable tool/script with no surrounding conceptual explanation |
+| **None detected** | Free-form prose, no Q&A markers, no H2 headings, no tables | Group by paragraph clusters. Do NOT force-split — thin units are acceptable. Each unit is a stub/draft |
 
-If a file has weak signals of two types:
-- Has some Q&A markers but no timestamps, AND mentions arxiv → treat as research-report (higher standard)
-- Has structured headings but no citations → treat as casual-note (no reference = casual)
-- Chat export that contains research discussion with arxiv refs → treat as chat-export (self-contained still applies)
+Apply all matched strategies. If strategies produce overlapping units (e.g., a Q&A pair that also contains an experiment table), merge the overlap.
+
+### 1.2 Reference check — what is traceable
+
+Check whether the source file contains references to external, findable material. This affects:
+- Whether to offer pulling additional sources during ingest
+- Whether the resulting notes can later be deepened
+
+| Signal | Examples | Ingest action |
+|--------|----------|--------------|
+| **arxiv / DOI / URL** | `arXiv:2405.xxxxx`, `https://doi.org/...`, `paper.pdf` | "这篇笔记引用了 [citation]。需要我拉取原文/元数据吗？" If yes → fetch; if no → record citation in `## 来源` |
+| **repo / file path** | `~/TinyFusion/mxfp4.py`, `quant_layer.py:128` | "引用了 [path]。需要我读取代码吗？" If yes → read and incorporate |
+| **experiment reference** | `tiny_learned_mxfp4_experiment.py`, `run_ablation.sh`, `results.json` | "提到了实验 [name]。需要我查找实验脚本和输出吗？" If yes → search and attach |
+| **none** | No arxiv, path, URL, file name, experiment name | Skip reference pull. Resulting notes will be deepen-blocked until user provides references later |
+
+The structure and reference checks are independent. A file can be:
+- Structured Q&A **with** arxiv refs → extract by Q&A, offer to pull paper
+- Structured Q&A **without** refs → extract by Q&A, no pull, deepen-blocked
+- Free-form **with** a repo path → extract as paragraphs, offer to read code
+- Free-form **without** refs → extract as paragraphs, no pull, deepen-blocked
 
 ---
 
-## Phase 2: EXTRACT — Branch by Type
+## Phase 2: EXTRACT — Strategy by Structure
 
-### chat-export
+Apply the extraction strategies identified in the structure check. Each matched pattern produces units:
+
+### Q&A extraction
 
 ```
 1. Identify Q&A boundaries (timestamps, user prefix changes)
-2. Group adjacent Q&A pairs by topic
+2. Group adjacent Q&A pairs by topic:
+   - Same concept discussed across multiple exchanges → one unit
+   - Topic shifts to a new concept → new unit
 3. For each topic group:
-   - Extract the answer content as the knowledge payload
-   - Discard questions (unless the question itself contains substantive framing)
-   - Keep code blocks, paper references, technical claims
-   - Strip: greetings, "let me think...", meta-commentary
-4. Yield: 2-5 atomic knowledge units, each tagged with source="chat-export"
+   - Extract the answer/explanation content as the knowledge payload
+   - Discard questions unless they contain substantive framing
+   - Keep code blocks, technical claims, paper references
+   - Strip: greetings, meta-commentary ("let me think..."), filler
+4. Yield: 2-5 units per file, each tagged with source=<original file name>
 ```
 
-### research-report
+### Section extraction
 
 ```
-1. Check what citations are present:
-   - arxiv ID? → note it; offer to fetch paper metadata
-   - repo path? → note it; offer to read code
-   - experiment name? → note it; offer to find output
-2. If user provides additional reference material → incorporate it
-3. Extract structured knowledge:
-   - Each ## section that describes a distinct method/concept → one unit
-   - Experiment results (tables, metrics) → one unit
-   - Code snippets describing implementation → inline or separate Code-Tools unit
-4. Yield: 1-6 units, each tagged with the reference it depends on
+1. Parse H2 headings as section boundaries
+2. Each section → one candidate unit (heading becomes the unit's title)
+3. Merge adjacent sections if:
+   - Both <50 words and on the same topic
+   - One section is clearly a sub-detail of the other
+4. Skip boilerplate sections: "References", "致谢", "Appendix"
+5. Yield: 1-8 units per file
 ```
 
-### casual-note
+### Experiment data extraction
 
 ```
-1. Scan for coherent idea groups (paragraphs that form a single thought)
-2. Extract each as a unit — even if thin
-3. If a unit mentions a concept by name → create the unit as a stub
-4. DO NOT expand, DO NOT infer missing content, DO NOT deepen
-5. Each unit's frontmatter should include source: pointing to the original note
-6. Yield: 1-N units, all thin, all status=draft (never polished)
+1. Identify config + results as one coherent unit
+2. Extract the experiment configuration (model, precision, hyperparams)
+3. Extract the results table with numeric metrics
+4. Keep them together — do NOT split config from results
+5. Add a placeholder ## 分析 section for user to fill
+6. Yield: 1 unit per distinct experiment
 ```
 
-### Extraction quality rules (all types)
+### Free-form extraction
+
+```
+1. Scan for coherent idea groups (paragraph clusters on the same topic)
+2. Split at clear topic transitions (new concept introduced, subject changes)
+3. Each unit is thin by nature — do NOT pad
+4. DO NOT expand, DO NOT infer missing content
+5. Yield: 1-N units, all draft/stub
+```
+
+### Quality rules (all extraction types)
 
 - One concept/topic per unit
 - Unit must be independently understandable (passes "standalone .md" test)
 - If a unit is <50 words and not a code block → consider merging with adjacent related unit
-- If extraction yields 0 units → report and skip. Do NOT fabricate.
+- If extraction yields 0 units → report and skip. Do NOT fabricate
 
 ---
 
@@ -161,8 +190,6 @@ For each unit at its target location:
    ask user if they should be merged
 ```
 
-No pre-computed decision matrix. Ask the user. They know better than any heuristic.
-
 ---
 
 ## Phase 5: FORMAT
@@ -188,11 +215,9 @@ Apply standard Obsidian formatting:
 | Concept explanation | `#type/concept` |
 | Experiment data | `#type/experiment` |
 | Daily reflection | `#type/daily` |
-| From chat-export | `#status/draft` |
-| From research-report | `#status/draft` (or polished only if deepen passed) |
-| From casual-note | `#status/draft` |
 | Belongs to domain X | `#area/<kebab-X>` |
 | Discusses specific technique | `#technique/<name>` (detect from content keywords) |
+| Default status | `#status/draft` |
 
 ---
 
@@ -216,12 +241,14 @@ Apply standard Obsidian formatting:
 ```
 Output:
   源文件: [N] 个
-  识别类型: chat-export [n] / research-report [n] / casual-note [n]
+  检测到的结构模式: Q&A [n] / 章节 [n] / 实验数据 [n] / 自由文本 [n]
+  检测到的参考: arxiv/DOI [n] / repo路径 [n] / 实验名 [n] / 无 [n]
   创建笔记: [N] 篇
   合并到已有笔记: [N] 篇
   跳过: [N] 篇 (原因: ...)
   更新 MOC: [N] 个
-  需要用户补充参考: [N] 篇 (列出)
+  已拉取补充参考: [N] 项 (列出)
+  需要用户手动补充参考: [N] 篇 (列出)
 ```
 
 ---
