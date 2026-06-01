@@ -12,7 +12,27 @@ Extract `domains[]` — this drives the classification keyword table and AREA di
 
 ---
 
-## Phase 1: INVENTORY — Structure & Reference Check
+## Phase 1: PRESERVE RAW SOURCE
+
+Before reading for extraction, make the ingest non-destructive.
+
+```
+1. Never edit, delete, move, replace, or overwrite the user's original source file.
+2. If the source file is outside the vault:
+   - Create <vault>/3-Resources/Sources/YYYY-MM-DD/ if needed.
+   - Copy the source file there using a collision-safe name.
+   - If a same-name snapshot exists, append a numeric suffix; do not overwrite it.
+3. If the source file is already inside the vault:
+   - Do not move it.
+   - Treat its current path as source_snapshot.
+4. Record source_snapshot for every extracted note.
+```
+
+The extracted note is a derivative working note, not a replacement for the source. The raw source remains the ground truth.
+
+---
+
+## Phase 2: INVENTORY — Structure & Reference Check
 
 Read each source file. Run two independent checks. They answer different questions and both must be performed.
 
@@ -22,13 +42,28 @@ Detect which organizational patterns are present in the file. A file can match z
 
 | Pattern | Signal | Extraction strategy |
 |---------|--------|-------------------|
-| **Q&A** | `**User**:` / `**Assistant**:` markers, timestamps, conversational turn-taking | Identify Q&A boundaries → group adjacent pairs by topic → extract answer content, discard questions and filler |
+| **Q&A** | `**User**:` / `**Assistant**:` markers, timestamps, conversational turn-taking | Identify Q&A boundaries → group adjacent pairs by topic → preserve questions, constraints, uncertainty, failed attempts, decision rationale, and answer content together |
 | **Sections** | `## ` H2 headings, especially structured ones like `方法`, `结果`, `实验`, `Method`, `Results`, `Experiment` | Split at H2 boundaries. Each H2 section → one candidate unit. Merge adjacent short (<50 word) sections on the same topic |
 | **Experiment data** | Tables with numeric metrics (MSE, FID, PSNR, accuracy, etc.), config blocks (YAML/JSON), "baseline vs ours" comparison | Keep as experiment record. Config + results table stay together as one unit |
 | **Code blocks** | Fenced code blocks (```) | Keep inline if illustrating a concept. Extract standalone to `3-Resources/Code-Tools/` only if it's a reusable tool/script with no surrounding conceptual explanation |
-| **None detected** | Free-form prose, no Q&A markers, no H2 headings, no tables | Group by paragraph clusters. Do NOT force-split — thin units are acceptable. Each unit is a stub/draft |
+| **None detected** | Free-form prose, no Q&A markers, no H2 headings, no tables | Group by paragraph clusters. Do NOT force-split and do NOT flatten the author's thinking path. Each unit is a stub/draft |
 
-Apply all matched strategies. If strategies produce overlapping units (e.g., a Q&A pair that also contains an experiment table), merge the overlap.
+Apply all matched strategies. If strategies produce overlapping units (e.g., a Q&A pair that also contains an experiment table), merge the overlap in the derivative notes only. Never remove content from the raw source snapshot.
+
+### 2.1 Reasoning-context check — what must be preserved
+
+During extraction, explicitly scan for thinking-process signals and preserve them in the derived note:
+
+| Signal | Preserve as |
+|--------|-------------|
+| User questions, prompts, why this was asked | `## 原始问题` |
+| Constraints, assumptions, preferences, scope limits | `## 约束与上下文` |
+| Hypotheses, uncertainty, open questions, TODOs | `## 未确定点` |
+| Failed attempts, negative results, rejected approaches | `## 失败尝试` |
+| Step-by-step reasoning, trade-offs, decision rationale | `## 推理脉络` |
+| Corrections, reversals, contradictory claims | `## 待确认` |
+
+Do not classify these as filler. If unsure whether a passage is filler or reasoning context, keep it.
 
 ### 1.2 Reference check — what is traceable
 
@@ -51,7 +86,7 @@ The structure and reference checks are independent. A file can be:
 
 ---
 
-## Phase 2: EXTRACT — Strategy by Structure
+## Phase 3: EXTRACT — Strategy by Structure
 
 Apply the extraction strategies identified in the structure check. Each matched pattern produces units:
 
@@ -63,11 +98,11 @@ Apply the extraction strategies identified in the structure check. Each matched 
    - Same concept discussed across multiple exchanges → one unit
    - Topic shifts to a new concept → new unit
 3. For each topic group:
-   - Extract the answer/explanation content as the knowledge payload
-   - Discard questions unless they contain substantive framing
-   - Keep code blocks, technical claims, paper references
-   - Strip: greetings, meta-commentary ("let me think..."), filler
-4. Yield: 2-5 units per file, each tagged with source=<original file name>
+   - Preserve the user's question if it frames motivation, constraints, uncertainty, or decision context
+   - Preserve answer/explanation content as the knowledge payload
+   - Keep code blocks, technical claims, paper references, corrections, and failed attempts
+   - Strip only pure greetings or transport noise that has no research meaning
+4. Yield: 2-5 units per file, each tagged with source=<original file name> and source_snapshot=<raw snapshot path>
 ```
 
 ### Section extraction
@@ -78,7 +113,7 @@ Apply the extraction strategies identified in the structure check. Each matched 
 3. Merge adjacent sections if:
    - Both <50 words and on the same topic
    - One section is clearly a sub-detail of the other
-4. Skip boilerplate sections: "References", "致谢", "Appendix"
+4. Skip boilerplate sections only if they contain no citations, assumptions, caveats, or reasoning context. Keep references/caveats that affect interpretation
 5. Yield: 1-8 units per file
 ```
 
@@ -98,9 +133,10 @@ Apply the extraction strategies identified in the structure check. Each matched 
 ```
 1. Scan for coherent idea groups (paragraph clusters on the same topic)
 2. Split at clear topic transitions (new concept introduced, subject changes)
-3. Each unit is thin by nature — do NOT pad
-4. DO NOT expand, DO NOT infer missing content
-5. Yield: 1-N units, all draft/stub
+3. Preserve the original order of ideas inside each unit when that order reflects thinking or exploration
+4. Each unit is thin by nature — do NOT pad
+5. DO NOT expand, DO NOT infer missing content
+6. Yield: 1-N units, all draft/stub
 ```
 
 ### Quality rules (all extraction types)
@@ -109,10 +145,12 @@ Apply the extraction strategies identified in the structure check. Each matched 
 - Unit must be independently understandable (passes "standalone .md" test)
 - If a unit is <50 words and not a code block → consider merging with adjacent related unit
 - If extraction yields 0 units → report and skip. Do NOT fabricate
+- Preserve reasoning context even if it makes a note less polished
+- Do not remove contradictions; mark them under `## 待确认`
 
 ---
 
-## Phase 3: CLASSIFY — Match-First
+## Phase 4: CLASSIFY — Match-First
 
 Classification proceeds in four steps. Stop at the first step that produces a clear result.
 
@@ -176,35 +214,39 @@ For `<project>` and `<topic>` in the paths above: if the unit content names a sp
 
 ---
 
-## Phase 4: DE-DUPLICATE
+## Phase 5: DE-DUPLICATE
 
 ```
 For each unit at its target location:
 
 1. Check if a file with the same name exists at the target path
 2. If yes → present both to user:
-   "目标位置已存在 [existing-note]。新笔记: [N] 字, 旧笔记: [M] 字。
-    合并 / 替换 / 保留两份 / 跳过？"
+    "目标位置已存在 [existing-note]。新笔记: [N] 字, 旧笔记: [M] 字。
+     追加 / 创建版本副本 / 跳过？"
 3. If no → create new note
 4. If similar topic but different name → check first 100 chars of both,
-   ask user if they should be merged
+    ask user if they should be merged
 ```
+
+Never offer destructive replace. If user asks to merge, append with provenance markers and preserve both versions' reasoning context. Use headings like `## 新增自 <source_snapshot>` instead of overwriting existing sections.
 
 ---
 
-## Phase 5: FORMAT
+## Phase 6: FORMAT
 
 Apply standard Obsidian formatting:
 
 ```
 1. YAML frontmatter:
-   - tags: derived from classification + content
-   - created: current date
-   - source: original file name
+    - tags: derived from classification + content
+    - created: current date
+    - source: original file name
+   - source_snapshot: vault-relative path to raw source snapshot
 2. [[wikilinks]] for all internal references
 3. H1 title, H2 sections
 4. Single blank line between sections
-5. ## 来源 section linking back to source file
+5. ## 来源 section linking back to source file and source_snapshot
+6. Add context sections when present: ## 原始问题 / ## 约束与上下文 / ## 推理脉络 / ## 未确定点 / ## 失败尝试 / ## 待确认
 ```
 
 ### Tag assignment
@@ -221,10 +263,10 @@ Apply standard Obsidian formatting:
 
 ---
 
-## Phase 6: PLACE
+## Phase 7: PLACE
 
 ```
-1. Write .md to target directory
+1. Write .md to target directory using a collision-safe path
 2. If target directory doesn't exist → create it (including parent paths)
 3. Update parent _index.md MOC:
    - For 1-Projects/<Project>/ and 2-Areas/<Area>/: add [[link]] to the new note
@@ -234,14 +276,18 @@ Apply standard Obsidian formatting:
    - For vague references → remove the link, add a ## 待办 bullet
 ```
 
+If the target .md already exists, do not overwrite it. Use the Phase 5 de-duplication decision: append, create a versioned copy, or skip.
+
 ---
 
-## Phase 7: REPORT
+## Phase 8: REPORT
 
 ```
 Output:
   源文件: [N] 个
+  原始快照: [N] 个 (列出路径)
   检测到的结构模式: Q&A [n] / 章节 [n] / 实验数据 [n] / 自由文本 [n]
+  保留的推理脉络: 原始问题 [n] / 约束 [n] / 未确定点 [n] / 失败尝试 [n] / 待确认 [n]
   检测到的参考: arxiv/DOI [n] / repo路径 [n] / 实验名 [n] / 无 [n]
   创建笔记: [N] 篇
   合并到已有笔记: [N] 篇
@@ -294,6 +340,7 @@ When creating notes, use these templates (from `templates/`):
 │   ├── Papers/<topic>/
 │   ├── Code-Tools/
 │   ├── Presentations/
+│   ├── Sources/YYYY-MM-DD/      Raw source snapshots from ingest
 │   └── Tutorials/
 └── 4-Archives/
 ```

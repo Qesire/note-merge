@@ -59,7 +59,14 @@ All behavior is driven by `~/KnowledgeBase/note-merge.json`. If that file does n
 ingest <files...>
 ```
 
-Take one or more source files and absorb their knowledge into the vault.
+Take one or more source files and absorb their knowledge into the vault without overwriting the originals.
+
+Before extraction, preserve the raw source:
+
+1. Never edit, delete, move, or overwrite the user's original source file.
+2. If the source file is outside the vault, copy it into `3-Resources/Sources/YYYY-MM-DD/` before processing.
+3. If the source file is already inside the vault, keep it in place and treat its current path as the raw snapshot.
+4. Every created or updated note must include both `source:` and `source_snapshot:` pointing to the original or archived raw source.
 
 Processing is driven by two independent checks on the source file. They are not mutually exclusive — a file can match multiple signals in both dimensions.
 
@@ -69,13 +76,25 @@ Read the file. Detect which of these patterns are present. Apply each that match
 
 | Pattern | Signal | Extraction strategy |
 |---------|--------|-------------------|
-| **Q&A** | `**User**:` / `**Assistant**:` markers, timestamps, conversational turn-taking | Identify Q&A boundaries → group adjacent pairs by topic → extract the answer content, discard questions and filler |
+| **Q&A** | `**User**:` / `**Assistant**:` markers, timestamps, conversational turn-taking | Identify Q&A boundaries → group adjacent pairs by topic → preserve the user's questions, constraints, uncertainties, failed attempts, and decision rationale together with the answer content |
 | **Sections** | `## ` H2 headings structured as `方法` / `结果` / `实验` / `分析` / `Method` / `Results` etc. | Use H2 boundaries to split into units. Each H2 section = one candidate unit (merge adjacent short ones) |
 | **Experiment data** | Tables with numeric metrics (MSE, FID, accuracy, PSNR), config blocks (YAML/JSON), "baseline" vs "ours" comparison | Extract as experiment record. Keep the config + results table together as one unit |
 | **Code blocks** | Fenced code blocks (```) | Keep inline if illustrating a concept; extract to `3-Resources/Code-Tools/` only if it's a standalone reusable script |
 | **None of the above** | Free-form prose, no clear structure | Keep as one or a few units based on paragraph grouping. Do NOT force-split. Each unit becomes a stub/draft |
 
-A file can match multiple patterns (e.g., Q&A with embedded code blocks, or sections containing experiment tables). Apply each matched strategy in order, deduplicating overlap.
+A file can match multiple patterns (e.g., Q&A with embedded code blocks, or sections containing experiment tables). Apply each matched strategy in order, deduplicating overlap. Deduplication means avoiding duplicate extracted notes, not deleting raw material or removing reasoning context.
+
+### 1.1a Reasoning-context preservation
+
+When extracting, preserve the original thinking path whenever it appears. Do not strip any of these as "filler":
+
+- User questions and why the question was asked
+- Constraints, assumptions, preferences, and rejected options
+- Uncertainty, TODOs, hypotheses, failed attempts, and negative results
+- Step-by-step reasoning, decision rationale, trade-off discussion
+- Corrections, reversals, and contradictions between sources
+
+If unsure whether something is filler or reasoning context, keep it. Put preserved context under sections like `## 原始问题`, `## 约束与上下文`, `## 推理脉络`, `## 未确定点`, or `## 失败尝试`.
 
 ### 1.2 Reference check — what can be traced
 
@@ -131,11 +150,11 @@ Step 4 — AMBIGUITY RESOLUTION
 
 After classification, check if a similar note already exists at the target path:
 
-- Exact same title? → Ask user: merge / replace / keep-both
+- Exact same title? → Ask user: append / create-versioned-copy / skip. Never replace or overwrite.
 - Similar topic (same concept, different phrasing)? → Show both titles + first 100 chars, ask user
 - No match → create new note
 
-No decision matrix needed — just ask the user.
+No decision matrix needed — just ask the user. "Merge" means append with provenance and preserve both versions' reasoning context; it never means destructive replacement.
 
 ### 1.5 Output format
 
@@ -146,6 +165,7 @@ Every created note must have:
 tags: [type/..., area/..., status/draft]
 created: YYYY-MM-DD
 source: <original file name>
+source_snapshot: <vault-relative raw source path>
 ---
 ```
 
@@ -238,15 +258,17 @@ Load `references/vault-setup.md` for the directory skeleton and Obsidian config 
 
 | # | Rule |
 |---|------|
-| 1 | Never delete original source files |
-| 2 | Never fabricate content — an accurate stub is better than a hallucinated note |
-| 3 | Always read `note-merge.json` before acting |
-| 4 | Notes without traceable references (paper, code, experiment) CANNOT be deepened — ask user to provide sources |
-| 5 | Classify by matching vault content first, keywords second |
-| 6 | Ask user when ambiguous — do not guess |
-| 7 | Every .md must have frontmatter with `tags:` and `created:` |
-| 8 | Internal links → `[[wikilinks]]`, never `[text](path.md)` |
-| 9 | Chinese content → Chinese filename; English → kebab-case |
+| 1 | Never edit, delete, move, replace, or overwrite original source files |
+| 2 | Ingest must preserve a raw source snapshot or stable in-vault source link before extraction |
+| 3 | Never discard reasoning context: questions, constraints, uncertainty, failed attempts, trade-offs, corrections, and decision rationale must be preserved |
+| 4 | Never fabricate content — an accurate stub is better than a hallucinated note |
+| 5 | Always read `note-merge.json` before acting |
+| 6 | Notes without traceable references (paper, code, experiment) CANNOT be deepened — ask user to provide sources |
+| 7 | Classify by matching vault content first, keywords second |
+| 8 | Ask user when ambiguous — do not guess |
+| 9 | Every .md must have frontmatter with `tags:`, `created:`, `source:`, and `source_snapshot:` when created from ingest |
+| 10 | Internal links → `[[wikilinks]]`, never `[text](path.md)` |
+| 11 | Chinese content → Chinese filename; English → kebab-case |
 
 ---
 

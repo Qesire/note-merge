@@ -13,6 +13,7 @@ Boundary scenarios and their handling protocols. Load this when any action encou
 - Add ## 缺失信息 section listing what's needed
 - Do NOT deepen. Report: "创建 stub，需要 {具体信息}"
 - Do NOT invent content
+- Preserve the original source snapshot anyway; a thin note must still link back to the raw source
 ```
 
 ---
@@ -31,7 +32,22 @@ Check the note's current state for reference signals:
 | `## 来源` section with concrete, findable references | ✅ Allow |
 | None of the above | ❌ Block — reply: "这篇笔记缺乏可追溯的参考材料（论文、代码、实验数据）。无法深化。请提供至少一项外部来源。" |
 
-This check is on the note's CURRENT state, not its original source type. A note that was ingested from Q&A chat may have references embedded in its content. A note that was ingested from a "paper note" file may have lost its references in extraction. What matters is what's in the note now.
+This check is on the note's CURRENT state, not its original source type. A note that was ingested from Q&A chat may have references embedded in its content. A note that was ingested from a "paper note" file may have lost its references in extraction. What matters is what's in the note now. If `source_snapshot:` exists, inspect the raw snapshot before declaring references missing.
+
+---
+
+## 2a. Existing Target Note / Overwrite Risk
+
+**Trigger:** Ingest would write to a path that already exists, or the user asks to merge into an existing note.
+
+```
+- Never overwrite the existing note.
+- Never replace existing sections destructively.
+- Offer only: append / create-versioned-copy / skip.
+- If appending, add a provenance heading: ## 新增自 <source_snapshot>
+- Preserve both the old note's reasoning context and the new source's reasoning context.
+- If the user explicitly says "replace", ask for confirmation and recommend versioned copy instead.
+```
 
 ---
 
@@ -72,6 +88,8 @@ This check is on the note's CURRENT state, not its original source type. A note 
 - Report progress between batches
 - Do NOT truncate or skip
 - Do NOT dump entire file into one note
+- Preserve a raw source snapshot before batch processing
+- Keep cross-batch reasoning links: if a later batch depends on an earlier question/constraint, mention that dependency in `## 约束与上下文`
 ```
 
 ---
@@ -121,6 +139,8 @@ Decision:
 - Structure ambiguity: apply BOTH matching strategies, deduplicate overlapping units
   Example: a chat export with section headings → extract Q&A AND split by sections.
   If both produce the same unit, keep the richer version.
+- Deduplication is only for derivative extracted notes. Do not delete raw snapshot content.
+- If two structures preserve different reasoning paths, keep both or add both under `## 推理脉络`.
 - Reference ambiguity: perform the reference check independently of structure.
   A casual-looking note with an arxiv link still gets the offer to pull the paper.
   A well-structured report with no references still gets deepen-blocked.
