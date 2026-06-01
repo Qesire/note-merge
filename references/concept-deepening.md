@@ -1,6 +1,8 @@
 # Concept Deepening (概念深化)
 
-Apply the 5-layer analytical framework when the user asks to deepen existing concept notes (深化笔记, 深挖), or when new code is available that should be traced into concept notes.
+Apply the 5-layer analytical framework when the user asks to deepen existing concept notes (深化笔记, 深挖).
+
+This framework is **domain-agnostic**. It works for any knowledge domain — sciences, engineering, humanities, arts, business — as long as the concept note has traceable references (see Layer checks below). The examples in this document are illustrative; adapt the concrete verification methods to the domain of the note being deepened.
 
 ---
 
@@ -12,27 +14,27 @@ For each concept, answer these questions in order:
 Layer 1: 动机 (Motivation)
   → What specific problem does this concept solve?
   → What breaks if you remove/disable it?
-  → What distribution, architecture, or data property makes this necessary?
+  → What context, constraint, or prior work makes this necessary?
 
 Layer 2: 机制 (Mechanism)
-  → How is it implemented? (file:line in source code)
-  → Full forward-pass flow in pseudo-code
-  → Math formula → code mapping
+  → How does it work? (step-by-step)
+  → What are its components, inputs, outputs, and internal state?
+  → Where is it implemented or instantiated? (file:line, section, artifact reference)
 
 Layer 3: 设计理由 (Design Rationale)
   → Why this approach over alternatives?
-  → Why these specific parameters (block_size, levels, learning rates)?
-  → Trade-offs analyzed (memory vs accuracy, speed vs quality)
+  → Why these specific parameters, defaults, or design choices?
+  → What trade-offs were made and why?
 
 Layer 4: 必要性验证 (Evidence)
-  → Ablation: what happens if removed? (experimental data)
-  → Distribution experiments: which cases it helps, which it doesn't
-  → Quantified gains: MSE reduction, SQNR improvement, speedup
+  → What concrete evidence supports the claims about this concept?
+  → Under what conditions does it work, and when does it fail?
+  → Quantified results: measurements, benchmarks, comparisons, case studies
 
 Layer 5: 系统性 (System Coupling)
   → Upstream: what feeds into this concept?
   → Downstream: what depends on this concept?
-  → Cross-references: links to other concept notes in 2-Areas/
+  → Cross-references: links to other concept notes, projects, papers
 ```
 
 ---
@@ -43,16 +45,16 @@ Layer 5: 系统性 (System Coupling)
 EXISTING NOTE (status/stub or status/draft in 2-Areas/)
        │
        ▼
-Step 1: SOURCE TRACE — read all source files referenced in the note
+Step 1: SOURCE TRACE — read all source files and references cited in the note
        │
        ▼
 Step 2: CROSS-REFERENCE — read related concept notes for coupling links
        │
        ▼
-Step 3: EXPERIMENT DATA — find relevant experiment scripts and their outputs
+Step 3: EVIDENCE GATHERING — locate experiments, data, benchmarks, or other evidence
        │
        ▼
-Step 4: REWRITE — restructure note with 5-layer headings, preserving all file:line refs
+Step 4: REWRITE — restructure note with 5-layer headings, preserving all references
        │
        ▼
 Step 5: LINK — add [[wikilinks]] to upstream/downstream concept notes
@@ -63,65 +65,87 @@ Step 6: TAG — update status from stub/draft → polished
 
 ---
 
-## Source Code Tracing Rules
+## Source Tracing (Layer 2)
 
-When deepening, the following must be read and referenced:
+When deepening, trace the concept back to its primary sources:
 
-| Concept type | Required sources |
-|-------------|-----------------|
-| Quantization format | `mxfp4.py` (format definition) + `*_experiment.py` (distribution analysis) + `quant_layer.py` (how quantizer is used) |
-| Rotation/transform | `rotations.py` + `core.py` (DartQuant) + `quarot_quant_layer.py` (ViDiT-Q variant) |
-| Loss function | The loss definition + the training loop that uses it + the benchmark that compares it |
-| PTQ algorithm | `adaptive_rounding.py` + `block_recon.py` + `quant_block.py` + `models.py` (for calib flow) |
-| Model architecture | `models.py` (full class definitions) + `quant_block.py` (quantized variant) |
-| Compression/pruning | `prune_by_score.py` (algorithm) + `train_masked_kd.py` (recovery) + `models.py` (architecture) |
-| Diffusion guidance | `paper_version.py` (full pipeline) + `measurements.py` (operators) |
+1. **Identify reference types in the note:**
+   - Source code files/paths → search `source_repos` from `note-merge.json`
+   - Academic papers → retrieve via arXiv, DOI, or URL
+   - Books, articles, primary documents → locate by citation
+   - Data, experiments, benchmarks → find scripts, logs, results files
 
----
+2. **For code-based concepts:**
+   - Search `source_repos` for files whose names or content match the concept name and related keywords
+   - Read the implementation, configuration, and test files
+   - Trace how the concept is instantiated and used across the codebase
+   - Record exact file:line references for key definitions and usages
 
-## Layer 3: Design Rationale Patterns
+3. **For paper-based concepts:**
+   - Locate the original paper and any follow-up work
+   - Extract the formal definition, methodology section, and results
+   - Note which sections/figures/tables are most relevant
 
-Common design questions to answer for each concept type:
+4. **For other domains:**
+   - Follow the same principle: locate the primary source, read the relevant sections, record references
+   - Adapt the "file:line" mapping to whatever citation format is natural for the domain (page numbers, section IDs, timestamps, etc.)
 
-**Numerical formats (MXFP4, INT4, etc.)**
-- Why these specific representable values?
-- Why block-shared scale vs per-element?
-- Why this block_size? (usually power-of-2 for hardware alignment)
-- Compare with alternative formats (INT4, NF4, FP8)
-
-**Rotations (Hadamard, QR-Orth, Cayley)**
-- Why block-wise vs global? (param count: C×B vs C²)
-- Why orthogonal? (preserves norm → doesn't change model semantics)
-- Fixed vs random vs learned trade-off table
-- Block_size choice: matches quantization block_size
-
-**Loss functions**
-- Why this functional form? (exp(-|x|) vs exp(-x²) tail behavior)
-- Why not directly optimize quantization MSE? (gradient issues)
-- Compare with alternatives: what each optimizes, what each ignores
-
-**PTQ algorithms**
-- Why block-level vs layer-level reconstruction?
-- Why temperature annealing? (soft→hard transition)
-- Why dual optimizer? (weight alpha vs activation delta different loss landscapes)
-- Why split calibration data to disk? (OOM prevention with batch_size calculation)
-
-**Architecture components (adaLN, attention)**
-- Why this conditioning mechanism? (concatenation vs cross-attention vs modulation)
-- Why N signals? (count by submodules × types of modulation)
-- Why zero-initialization? (identity-mapping start for stable training)
+5. **General rule:**
+   - Always cite the exact location within the source (file:line, page:paragraph, timestamp, etc.)
+   - Map between formal description and concrete implementation/instantiation
+   - If implementation files exist but are outside `source_repos`, ask the user for the path
 
 ---
 
-## Cross-Reference Rules
+## Design Rationale Heuristics (Layer 3)
+
+When analyzing why a design decision was made, ask these questions. They apply across domains; choose whichever are relevant to the concept at hand.
+
+| Question | Applies to |
+|----------|-----------|
+| Why this specific approach over named alternatives? | Any design decision |
+| Why these parameter values / defaults / thresholds? | Algorithm, system, or method parameters |
+| What constraint drove this choice? (performance, cost, compatibility, simplicity, convention) | Any trade-off |
+| What would happen if a different choice were made? | Comparative analysis |
+| Is there a precedent or standard that influenced this design? | Conventions, protocols, formats |
+| Does this choice couple or decouple the concept from its context? | Architecture, interfaces |
+
+For each answer, cite concrete evidence (benchmark, paper claim, design doc, standard, etc.). Do not rely on unsourced reasoning.
+
+---
+
+## Evidence Standards (Layer 4)
+
+Evidence requirements vary by domain. Adapt the evidence bar to the field:
+
+| Domain type | Valid evidence includes |
+|-------------|----------------------|
+| Experimental science / engineering | Named experiments with numeric metrics, ablation studies, benchmark results |
+| Formal / theoretical work | Proofs, theorems, formal verification results, complexity analysis |
+| Empirical / observational | Datasets, surveys, case studies, field observations with documented methodology |
+| Historical / textual | Primary sources, archival records, text-critical analysis, corroborating documents |
+| Design / creative | Prototypes, user studies, critiques, precedent analysis, iteration history |
+| Business / strategy | Market data, financial results, A/B tests, case outcomes |
+
+**Universal evidence rules:**
+- Every claim must cite a specific source (experiment name, paper section, dataset, document)
+- Quantitative claims need numbers; qualitative claims need documented examples
+- "效果好", "效果显著", "greatly improves" without specific source → FAIL
+- Absence of evidence must be noted, not papered over
+
+---
+
+## Cross-Reference Rules (Layer 5)
 
 Every deepened note MUST include `[[links]]` to:
 
-1. **Upstream concepts** — what feeds into it (e.g., Block-Rotation → MXFP4-Format)
-2. **Downstream concepts** — what depends on it (e.g., MXFP4-Format → DiTQuant-Validation experiments)
-3. **Related projects** — which projects implement/use it (e.g., `[[../../1-Projects/PTQ4DiT/_index|PTQ4DiT]]`)
-4. **Related papers** — which papers introduced/analyzed it (e.g., `[[../../3-Resources/Papers/quantization/ptq4dit|PTQ4DiT]]`)
-5. **Source code files** — the exact files that implement it (inline file:line references preserved from Layer 2)
+1. **Upstream concepts** — what feeds into it, what it depends on
+2. **Downstream concepts** — what depends on it, what it enables
+3. **Related projects** — which projects implement, apply, or use it
+4. **Related papers/sources** — which papers introduced, analyzed, or challenged it
+5. **Source files/artifacts** — the concrete things that instantiate it (inline references preserved from Layer 2)
+
+Each link must be accompanied by at least one sentence explaining the relationship, not just a bare wikilink.
 
 ---
 
@@ -133,11 +157,11 @@ Before marking a deepened note as `#status/polished`, verify every layer meets t
 
 | Layer | Minimum Requirement | How to Verify | Common Failures |
 |-------|--------------------|---------------|-----------------|
-| **L1 动机** | Must cite a SPECIFIC distribution property, data characteristic, or architecture constraint that makes this concept necessary. Must include at least one causal statement: "If X were removed, Y would degrade because Z." | Count causal statements: must have ≥ 1. Check if the property cited is concrete (e.g., "activation outliers in LayerNorm outputs") not generic (e.g., "quantization causes accuracy loss"). | "This solves the quantization error problem" — too vague. "Without block rotation, the per-channel variance in QKV projections (std=3.4) would be quantized unevenly, causing outlier channels to dominate MSE" — sufficient. |
-| **L2 机制** | Must have ≥ 1 file:line reference to actual source code. Pseudo-code must have ≥ 5 distinct steps showing data flow. Math→code mapping table must have ≥ 1 row. | Grep the note for `:\d+` pattern (file:line). Count pseudo-code steps. Count rows in math→code table. | Pseudo-code that is just "1. input → 2. process → 3. output" — 5 steps minimum. No file:line reference at all — code trace was not done. |
-| **L3 设计理由** | Must compare ≥ 2 named alternatives with ≥ 1 specific, quantified trade-off each. "Why this parameter value" must be answered for at least one key parameter. | Count alternatives listed by name. Check each has a concrete trade-off (number, condition, or cost statement). | "A is better than B" without saying WHY — fail. "block_size=32 because it's a power of 2" — marginal, add hardware alignment reasoning. |
-| **L4 证据** | Must cite ≥ 1 specific experiment by name with ≥ 1 numeric metric from actual results. May NOT use phrases like "效果显著", "明显提升", or any unsourced qualitative judgment as evidence. | Grep for digits (MSE values, FID scores, percentage changes). Check if values come from a named experiment script or log. | "实验表明效果很好" — fail, no numbers. "MSE improved by 0.0023 (from 0.0081 RTN to 0.0058 w/ rotation)" — sufficient. |
-| **L5 耦合** | Must have ≥ 2 upstream links (concepts this depends on) AND ≥ 2 downstream links (concepts depending on this). All target files must exist (no broken wikilinks). Upstream/downstream relationship must be EXPLAINED, not just listed. | Count `[[upstream]]` and `[[downstream]]` links. Verify each target file exists. Check for explanation text (at minimum one sentence per link). | Just listing `[[ConceptA]]` under "上游" with no text explaining the relationship — fail. Links to non-existent files — fail. |
+| **L1 动机** | Must cite a SPECIFIC problem, context, or constraint that makes this concept necessary. Must include at least one causal statement: "If X were removed/unavailable, Y would break/degrade because Z." | Count causal statements: must have ≥ 1. Check if the cited problem is concrete (e.g., "gradient instability in layer 12 of this architecture") not generic (e.g., "training is hard"). | "This solves the error problem" — too vague. "Without this mechanism, the variance across channels (measured at σ=3.4) would cause uneven behavior, corrupting downstream outputs" — sufficient. |
+| **L2 机制** | Must have ≥ 1 specific location reference to the primary source (file:line, paper section, book page, timestamp). Step-by-step description must have ≥ 5 distinct steps showing data/state flow. Formal-to-concrete mapping table must have ≥ 1 row. | Grep the note for location references (file:line patterns, section numbers, page numbers). Count distinct steps. Count mapping rows. | "1. input → 2. process → 3. output" — 5 steps minimum. No location reference at all — source trace was not done. |
+| **L3 设计理由** | Must compare ≥ 2 named alternatives with ≥ 1 specific, reasoned trade-off each. "Why this parameter value" must be answered for at least one key parameter or design choice. | Count alternatives listed by name. Check each has a concrete trade-off (number, condition, or cost statement). | "A is better than B" without saying WHY — fail. "threshold=0.5 was chosen because it balances precision (0.87) and recall (0.82) on the validation set" — sufficient. |
+| **L4 证据** | Must cite ≥ 1 specific piece of evidence by name (experiment, paper, dataset, case) with ≥ 1 concrete result (numeric metric, documented finding, source quote). May NOT use phrases like "效果显著", "明显提升", or any unsourced qualitative judgment as evidence. | Check if evidence source is named. Check if result is concrete. | "实验表明效果很好" — fail, no named source, no numbers. "On the XYZ benchmark, accuracy improved from 0.72 to 0.81 (±0.02, n=5 runs)" — sufficient. |
+| **L5 耦合** | Must have ≥ 2 upstream links (concepts this depends on) AND ≥ 2 downstream links (concepts depending on this). All target files must exist (no broken wikilinks). Each relationship must be EXPLAINED with ≥ 1 sentence. | Count `[[upstream]]` and `[[downstream]]` links. Verify each target file exists. Check for explanation text. | Just listing `[[ConceptA]]` under "上游" with no text explaining the relationship — fail. Links to non-existent files — fail. |
 
 ### Final Quality Checklist
 
@@ -145,23 +169,23 @@ Before accepting a deepened note, verify ALL of the following:
 
 ```
 Layer 1 (动机):
-  [ ] Contains a specific, named distribution/architecture/data property
-  [ ] Contains at least one causal "if removed, then..." statement
-  [ ] Does NOT use the generic phrase "量化误差" or "accuracy loss" without qualification
+  [ ] Contains a specific, named problem/context/constraint
+  [ ] Contains at least one causal "if removed/unavailable, then..." statement
+  [ ] Does NOT use vague problem statements without concrete qualification
 
 Layer 2 (机制):
-  [ ] At least 1 file:line reference to actual source code (e.g., mxfp4.py:128)
-  [ ] Pseudo-code has at least 5 distinct steps with clear data flow
-  [ ] At least 1 row in the math formula → code mapping table
+  [ ] At least 1 location reference to the primary source (file:line, section, page, timestamp)
+  [ ] Step-by-step description has at least 5 distinct steps with clear flow
+  [ ] At least 1 row in the formal description → concrete implementation/instantiation mapping
 
 Layer 3 (设计理由):
-  [ ] At least 2 named alternatives are compared (e.g., "Hadamard vs QR-Orth vs Random")
-  [ ] At least 1 trade-off has a specific, quantified reason (not just "better")
-  [ ] At least 1 key parameter value is justified
+  [ ] At least 2 named alternatives are compared
+  [ ] At least 1 trade-off has a specific, reasoned justification
+  [ ] At least 1 key parameter or design choice is justified
 
 Layer 4 (证据):
-  [ ] At least 1 named experiment cited (script or log file name)
-  [ ] At least 1 numeric metric from actual results (MSE, FID, SQNR, speedup %, etc.)
+  [ ] At least 1 named evidence source cited (experiment, paper section, dataset, document)
+  [ ] At least 1 concrete result (numeric or documented qualitative)
   [ ] NO unsourced qualitative claims ("效果显著", "明显改善", "greatly improves")
 
 Layer 5 (耦合):
@@ -172,7 +196,7 @@ Layer 5 (耦合):
 Meta:
   [ ] Tags include status/polished
   [ ] Frontmatter includes created date
-  [ ] Frontmatter includes at least one #technique/ tag
+  [ ] Frontmatter includes at least one #technique/ or #topic/ tag relevant to the domain
   [ ] Frontmatter includes deepened: date
 ```
 

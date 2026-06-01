@@ -6,6 +6,8 @@
 
 **数据安全：** 绝不会覆盖或删除原始源文件。每次 `整理` 会先把源文件复制到 vault 内的 `3-Resources/Sources/` 作为不可变快照，再从中提取衍生笔记。Agent 会保留原始问题、推理过程、失败尝试和约束上下文，不做有损压缩。
 
+**领域无关：** 核心逻辑（结构检查、参考检查、分类匹配、去重、健康检查）不绑定任何学科。`深入` 使用通用的 5 层分析框架（动机→机制→设计理由→证据→系统耦合），适用于工程技术、自然科学、人文社科、商业策略等任何有可追溯来源的知识领域。文档中的示例使用机器学习/量化领域仅为说明，读者可替换为自己的领域。
+
 ---
 
 ## 应用场景
@@ -144,8 +146,8 @@ Agent 不会只靠关键词分类。它会按以下顺序处理：
 ```json
 {
   "vault": "~/KnowledgeBase",
-  "domains": ["quantization", "diffusion", "low-level-vision"],
-  "source_repos": ["~/TinyFusion", "~/DiTQuantValidation"],
+  "domains": ["machine-learning", "systems", "algorithms"],
+  "source_repos": ["~/MyProject", "~/AnotherRepo"],
   "language": "zh-CN"
 }
 ```
@@ -204,7 +206,7 @@ note-merge/
 
 ```markdown
 ---
-tags: [type/concept, area/quantization, technique/mxfp4, status/draft]
+tags: [type/concept, area/machine-learning, technique/mxfp4, status/draft]
 created: 2026-06-01
 source: chat_export_0601.md
 source_snapshot: 3-Resources/Sources/2026-06-01/chat_export_0601.md

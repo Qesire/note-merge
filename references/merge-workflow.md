@@ -74,8 +74,8 @@ Check whether the source file contains references to external, findable material
 | Signal | Examples | Ingest action |
 |--------|----------|--------------|
 | **arxiv / DOI / URL** | `arXiv:2405.xxxxx`, `https://doi.org/...`, `paper.pdf` | "这篇笔记引用了 [citation]。需要我拉取原文/元数据吗？" If yes → fetch; if no → record citation in `## 来源` |
-| **repo / file path** | `~/TinyFusion/mxfp4.py`, `quant_layer.py:128` | "引用了 [path]。需要我读取代码吗？" If yes → read and incorporate |
-| **experiment reference** | `tiny_learned_mxfp4_experiment.py`, `run_ablation.sh`, `results.json` | "提到了实验 [name]。需要我查找实验脚本和输出吗？" If yes → search and attach |
+| **repo / file path** | `~/MyProject/impl.py`, `core_module.py:128` | "引用了 [path]。需要我读取代码吗？" If yes → read and incorporate |
+| **experiment / evidence ref** | `run_benchmark.sh`, `results.json`, `experiment_log.txt` | "提到了 [name]。需要我查找相关数据吗？" If yes → search and attach |
 | **none** | No arxiv, path, URL, file name, experiment name | Skip reference pull. Resulting notes will be deepen-blocked until user provides references later |
 
 The structure and reference checks are independent. A file can be:
@@ -316,8 +316,8 @@ When creating notes, use these templates (from `templates/`):
 |----------|------|
 | Note type | `#type/paper` `#type/concept` `#type/experiment` `#type/moc` `#type/daily` |
 | Status | `#status/draft` `#status/stub` `#status/polished` `#status/toread` `#status/archived` |
-| Area | Generated from `domains[]`: `#area/quantization` `#area/diffusion` etc. |
-| Technique | Detected from content: `#technique/ptq` `#technique/mxfp4` `#technique/hadamard` etc. |
+| Area | Generated from `domains[]`: `#area/machine-learning` `#area/systems` etc. |
+| Technique / Topic | Detected from content: `#technique/<name>` (kebab-case, derived from concept keywords) |
 
 ---
 

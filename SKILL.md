@@ -35,10 +35,10 @@ All behavior is driven by `~/KnowledgeBase/note-merge.json`. If that file does n
 ```json
 {
   "vault": "~/KnowledgeBase",
-  "domains": ["quantization", "diffusion", "low-level-vision"],
+  "domains": ["machine-learning", "systems", "algorithms"],
   "source_repos": [
-    "~/TinyFusion",
-    "~/DiTQuantValidation"
+    "~/MyProject",
+    "~/AnotherRepo"
   ],
   "language": "zh-CN"
 }
@@ -103,8 +103,8 @@ After extraction, check whether the source file contains traceable external refe
 | Signal | Example | Action during ingest |
 |--------|---------|---------------------|
 | **arxiv / DOI / URL** | `arXiv:2405.xxxxx`, `https://...`, `doi:...` | "这篇笔记引用了 [citation]，需要我拉取原文/元数据吗？" If user agrees, fetch and integrate. If not, annotate the note with the citation in `## 来源` |
-| **repo / file path** | `~/TinyFusion/mxfp4.py`, `quant_layer.py` | "引用了 [path]，需要我读取代码吗？" If user agrees, read and incorporate relevant snippets into the note body |
-| **experiment name** | `tiny_learned_mxfp4_experiment.py`, `run_ptq_ablation.sh` | "提到了实验 [name]，需要我查找实验输出吗？" If user agrees, search for the script and its output |
+| **repo / file path** | `~/MyProject/impl.py`, `core_module.py` | "引用了 [path]，需要我读取代码吗？" If user agrees, read and incorporate relevant snippets into the note body |
+| **experiment name / evidence** | `run_benchmark.sh`, `results.json`, `experiment_log.txt` | "提到了 [name]，需要我查找相关数据吗？" If user agrees, search for the file and its output |
 | **none** | No arxiv, no path, no URL, no specific file reference | Skip reference pull. The note goes in as draft/stub. Deepen will be BLOCKED unless user later provides references |
 
 A file can have references even if it's free-form (e.g., a casual note that mentions an arxiv ID). A file can lack references even if structured (e.g., lecture notes without citations). The two checks are independent.
@@ -122,8 +122,8 @@ Step 2 — CONTEXT MATCH
   Extract all [[wikilinks]], project names, paper references from the unit.
   Search vault for those references.
   If found → place this unit in the same directory / adjacent to the matched note.
-  Example: unit mentions [[Block-Rotation]] which lives in 2-Areas/Quantization/
-           → this unit also goes to 2-Areas/Quantization/
+  Example: unit mentions [[MyConcept]] which lives in 2-Areas/Machine-Learning/
+           → this unit also goes to 2-Areas/Machine-Learning/
 
 Step 3 — KEYWORD FALLBACK
   Only when Steps 1-2 yield nothing.
