@@ -1,381 +1,272 @@
-# Merge Workflow: Phase Details
+# Merge Workflow
 
-Full 7-phase workflow for processing raw notes into the KnowledgeBase.
-
----
-
-## Phase 1: INVENTORY
-
-Read all source files. For each file, determine:
-- **Type**: `chat-export`, `paper-note`, `concept-note`, `experiment-log`, `lecture-note`, `daily-journal`, `code-snippet`, `mixed`
-- **Primary topic**: quantization, diffusion, low-light, compression, tooling, career, other
-- **Quality**: well-structured / needs-cleaning / noisy
-- **Size**: single-concept / multi-concept / dump
-
-Report the inventory to the user before proceeding.
+Full ingest workflow for processing raw source files into the Obsidian vault.
 
 ---
 
-## Phase 2: EXTRACT
+## Phase 0: READ CONFIG
 
-For each source file, extract **atomic knowledge units**. The extraction quality determines everything downstream — too coarse and concepts stay buried; too fine and the vault fragments into noise.
+Before any processing, read `~/KnowledgeBase/note-merge.json`. If absent, abort and prompt `init-vault`.
 
-### 2.1 Definition of "Atomic Knowledge Unit"
-
-An atomic knowledge unit = a self-contained piece of knowledge that can answer at least one "why" or "how" question independently.
-
-**Test:** imagine this unit as a standalone .md file. Can a reader understand it without reading 3 other things first? If yes → atomic. If no → it depends on another unit, decide whether to merge or cross-link.
-
-### 2.2 Granularity Decision Table
-
-| Source file type | How to split | Typical yield | Warning signs of wrong granularity |
-|-----------------|-------------|---------------|-------------------------------------|
-| **Paper note** (full paper dump, 200+ lines) | One unit per distinct method/algorithm described; one unit per key result/claim; remove intro/related-work boilerplate | 3-6 concept units + 1 experiment unit | **Too coarse:** a single 80-line unit mixing method + result + comparison. **Too fine:** 15 one-paragraph units about minor details |
-| **Chat export** with multiple Q&A topics | One unit per answered topic; merge adjacent Q&A about same topic | 2-5 concept units per chat file | **Too coarse:** lumping all answers into one giant note. **Too fine:** one unit per sentence |
-| **Experiment log** / script output | One unit = one experiment run with config + result | 1 unit (or 1 per variant if configs differ) | **Too fine:** separating config from results. **Too coarse:** mixing two different experiments |
-| **Lecture/Presentation notes** | One unit per slide group that forms a coherent topic | 3-8 concept units per lecture | **Too coarse:** entire lecture as one note |
-| **Mixed scratch file** (thoughts + links + code) | Extract each distinct idea; code blocks go to Code-Tools separately | Variable | Leave code inline if it illustrates a concept; extract to Code-Tools only if it's a reusable script |
-| **Tutorial walkthrough** | One unit per step that teaches a distinct technique | 2-5 concept + 1-2 code-tool units | |
-
-### 2.3 Concept Boundary Heuristics
-
-When deciding whether two topics are "one concept" or "two concepts":
-
-```
-MERGE into one unit when:
-  - They answer the same "why" question
-  - One is a direct prerequisite of the other and neither is independently useful
-  - Together < 200 words — splitting would create two stubs
-
-SPLIT into two units when:
-  - Each could be the answer to a different "how does X work?" question
-  - One is technique-level (e.g., "Block Rotation") and the other is theory-level (e.g., "Orthogonal Transforms in Quantization")
-  - Each has ≥ 100 words of unique content
-  - They are used in different project contexts
-```
-
-### 2.4 Extraction Rules
-
-For all source types:
-- Strip conversational filler (greetings, meta-commentary, "let me think...")
-- Keep: factual statements, technical insights, code patterns, paper references, experimental results, questions/todos
-- Discard: pure chat boilerplate, emoji-only lines, duplicate adjacent lines
-- **If extraction yields 0 units:** source file has no extractable knowledge. Report and skip — do NOT fabricate content.
-
-For **chat exports** specifically:
-- Identify Q&A boundaries (look for timestamp/user prefixes)
-- Extract the answer/content, discard the question if it adds no value
-- If a Q&A pair is about a concept already covered by another pair, merge them into one unit
-
-### 2.5 Extraction Quality Self-Check
-
-Before proceeding to Phase 3, verify:
-- [ ] Every extracted unit passes the "standalone .md file" test
-- [ ] No unit is < 50 words unless it's a code snippet or config block
-- [ ] No unit is > 500 words — if so, re-check if it should be split
-- [ ] Units are named with a temporary descriptive title (used in Phase 3 classification)
+Extract `domains[]` — this drives the classification keyword table and AREA directories.
 
 ---
 
-## Phase 3: CLASSIFY
+## Phase 1: INVENTORY — Source Type Detection
 
-Assign each unit to the correct PARA location. Classification uses three sources of signal, applied in priority order.
+Read each source file. Determine its type. The type determines everything downstream.
 
-### 3.1 Primary: frontmatter / explicit declaration
+### Detection Signals
 
-If the source file has YAML frontmatter or explicit classification markers, use those first:
+| Signal | → Type |
+|--------|--------|
+| Contains `**User**:`, `**Assistant**:`, timestamps, Q&A markers | **chat-export** |
+| Contains arxiv ID (`arXiv:\d{4}\.\d+`), repo paths (`~/...`), experiment names, structured sections (`## 方法`, `## 结果`, `## Experiment`) | **research-report** |
+| None of the above; free-form text, personal reflections, scattered ideas | **casual-note** |
 
-| Signal | Classification |
-|--------|---------------|
-| `arxiv:` in frontmatter | `3-Resources/Papers/<topic>/` |
-| `project:` in frontmatter | `1-Projects/<Project>/` |
-| `status: polished/draft/stub` | Respect the status, place by content |
-| `## 论文笔记` heading | `3-Resources/Papers/<topic>/` |
-| `## 实验记录` heading | `1-Projects/<Project>/experiments/` |
+### Ambiguous cases
 
-### 3.2 Secondary: keyword-to-PARA mapping
+If a file has weak signals of two types:
+- Has some Q&A markers but no timestamps, AND mentions arxiv → treat as research-report (higher standard)
+- Has structured headings but no citations → treat as casual-note (no reference = casual)
+- Chat export that contains research discussion with arxiv refs → treat as chat-export (self-contained still applies)
 
-| Keywords (Chinese) | Keywords (English) | Target directory |
-|---------------------|--------------------|-----------------|
-| 实验, 测试, 跑, 训练, 脚本, 配置, 结果, 精度, MSE, FID | experiment, test, run, train, script, config, result, accuracy, metric | `1-Projects/<Project>/experiments/` |
-| 方法, 算法, 实现, 架构, 管线 | method, algorithm, implementation, architecture, pipeline | `1-Projects/<Project>/methods/` |
-| 论文, arxiv, paper, 文献, 阅读, 作者, 发表 | paper, arxiv, reading, author, published, conference | `3-Resources/Papers/<topic>/` |
-| 概念, 定义, 什么是, 原理, 为什么, 机制, 原因 | concept, definition, what is, principle, why, mechanism | `2-Areas/<Area>/` |
-| 教程, tutorial, 入门, 学习笔记, 课程, 教学 | tutorial, introduction, course, learn, guide | `3-Resources/Tutorials/` |
-| 代码, 工具, 脚本, CLI, 命令, github, repo | code, tool, script, CLI, command, github, repo, repo_path | `3-Resources/Code-Tools/` |
-| 讲座, PPT, slides, 报告, 汇报, presentation | lecture, PPT, slides, talk, presentation | `3-Resources/Presentations/` |
-| 日记, 记录, 今天, 反思, todo, 计划, 想法 | diary, journal, today, reflection, todo, plan, idea | `0-Inbox/daily/` |
-| 随手记, 杂, 碎片, 临时, 待分类 | scratch, fleeting, temp, uncategorized, misc | `0-Inbox/fleeting/` |
+---
 
-### 3.3 Tertiary: content structure heuristics
+## Phase 2: EXTRACT — Branch by Type
 
-When keywords are ambiguous or missing:
-
-| Heuristic | Classification | Confidence |
-|-----------|---------------|------------|
-| Content >200 lines | Paper note or tutorial (check for arxiv refs) | Medium |
-| Content <20 lines | Fleeting or stub | Medium |
-| Contains ``` code blocks AND no experiment results | Code-Tools | Medium |
-| Contains markdown tables with numeric metrics (MSE, FID, etc.) | Experiment | High |
-| Contains @author or arXiv:XXXX.XXXXX pattern | Paper | High |
-| Contains section headings like `## 定义`, `## 为什么重要` | Concept | High |
-| Contains timestamps and user/assistant markers | Chat export → trigger clean handler | High |
-| File begins with YAML frontmatter (---) | Use its `tags:` field for classification | High |
-
-### 3.4 Classification priority rules
-
-When multiple signals conflict, apply this priority:
+### chat-export
 
 ```
-1. User explicitly specifies target → ALWAYS follow user override
-2. Source file frontmatter (tags:, arxiv:, project:) → strongest automatic signal
-3. Content structure heuristics (table rows > 3, section headings present) → strong
-4. Keyword match count → more matching keywords = higher confidence
-5. Content length → long (>200 lines) favors paper/tutorial; short favors concept/stub
-6. If still ambiguous → ask user with top 2-3 suggestions
+1. Identify Q&A boundaries (timestamps, user prefix changes)
+2. Group adjacent Q&A pairs by topic
+3. For each topic group:
+   - Extract the answer content as the knowledge payload
+   - Discard questions (unless the question itself contains substantive framing)
+   - Keep code blocks, paper references, technical claims
+   - Strip: greetings, "let me think...", meta-commentary
+4. Yield: 2-5 atomic knowledge units, each tagged with source="chat-export"
 ```
 
-### 3.5 Multi-project disambiguation
-
-If a note mentions multiple projects (e.g., "compared TinyFusion and PTQ4DiT"):
+### research-report
 
 ```
-1. Check which project has the most keyword matches
-2. Check which project the source file path is closest to (file paths)
-3. If tied → ask user: "This note references both [ProjA] and [ProjB]. Where should it go?"
-4. Alternative: place in the Area note (2-Areas/) and link to both projects
+1. Check what citations are present:
+   - arxiv ID? → note it; offer to fetch paper metadata
+   - repo path? → note it; offer to read code
+   - experiment name? → note it; offer to find output
+2. If user provides additional reference material → incorporate it
+3. Extract structured knowledge:
+   - Each ## section that describes a distinct method/concept → one unit
+   - Experiment results (tables, metrics) → one unit
+   - Code snippets describing implementation → inline or separate Code-Tools unit
+4. Yield: 1-6 units, each tagged with the reference it depends on
 ```
 
-### 3.6 Unit-to-directory summary table
+### casual-note
 
-| Unit type | Target directory |
-|-----------|-----------------|
-| Paper summary/review | `3-Resources/Papers/<topic>/` |
-| Technical concept/definition | `2-Areas/<Area>/` as atomic .md |
-| Experiment result/log | `1-Projects/<Project>/experiments/` |
-| Method/algorithm analysis | `1-Projects/<Project>/methods/` |
-| Lecture/PPT learning notes | `3-Resources/Presentations/` |
-| Tutorial/background learning | `3-Resources/Tutorials/` |
-| Code snippet/tool note | `3-Resources/Code-Tools/` |
-| Personal reflection/todo | `0-Inbox/daily/` or `2-Areas/Career/` |
-| Fleeting/uncategorized | `0-Inbox/fleeting/` |
+```
+1. Scan for coherent idea groups (paragraphs that form a single thought)
+2. Extract each as a unit — even if thin
+3. If a unit mentions a concept by name → create the unit as a stub
+4. DO NOT expand, DO NOT infer missing content, DO NOT deepen
+5. Each unit's frontmatter should include source: pointing to the original note
+6. Yield: 1-N units, all thin, all status=draft (never polished)
+```
+
+### Extraction quality rules (all types)
+
+- One concept/topic per unit
+- Unit must be independently understandable (passes "standalone .md" test)
+- If a unit is <50 words and not a code block → consider merging with adjacent related unit
+- If extraction yields 0 units → report and skip. Do NOT fabricate.
+
+---
+
+## Phase 3: CLASSIFY — Match-First
+
+Classification proceeds in four steps. Stop at the first step that produces a clear result.
+
+### Step 1: Exact Title Match
+
+```
+1. Take the unit's title or H1 heading
+2. Search ~/KnowledgeBase/ for an existing .md with the same basename
+3. If found → unit belongs to the same directory as that note
+   → Skip to Phase 4 (de-duplicate against the existing note)
+```
+
+### Step 2: Context Match
+
+```
+1. Extract all [[wikilinks]], project names, paper references from the unit content
+2. For each reference:
+   - Search vault for a .md matching that reference name
+   - If found → note the directory it lives in
+3. If ALL references point to the same directory → unit goes there
+4. If references point to multiple directories → use the most specific one
+   (project > area > resource)
+5. If at least one reference matches → classification complete
+```
+
+### Step 3: Keyword Fallback
+
+Build the keyword mapping table from `note-merge.json` domains:
+
+```
+For each domain in note-merge.json:
+  Keyword: domain name, Chinese equivalent, common abbreviations
+  Target:  2-Areas/<DomainName>/
+
+Generic keywords (always active):
+
+| Keywords | Target |
+|----------|--------|
+| 论文, paper, arxiv | 3-Resources/Papers/<topic>/ |
+| 实验, 测试, experiment, 结果, 精度, metric | 1-Projects/<project>/experiments/ |
+| 方法, 算法, method, algorithm, 实现, 架构 | 1-Projects/<project>/methods/ |
+| 概念, 定义, 什么是, concept, definition | 2-Areas/<best-match-domain>/ |
+| 教程, tutorial, 入门, guide, 学习 | 3-Resources/Tutorials/ |
+| 代码, 工具, script, tool, CLI | 3-Resources/Code-Tools/ |
+| 讲座, PPT, slides, presentation, 报告 | 3-Resources/Presentations/ |
+| 日记, 反思, 计划, todo, 今天, daily | 0-Inbox/daily/ |
+
+Match by counting keyword occurrences in the unit's title + first 200 chars.
+The category with the most matches wins.
+```
+
+For `<project>` and `<topic>` in the paths above: if the unit content names a specific project (matching a directory under `1-Projects/`) or paper topic (matching a directory under `3-Resources/Papers/`), use that. Otherwise use the best domain match or leave as a generic slot.
+
+### Step 4: Ambiguity Resolution
+
+```
+- Multiple candidates with equal match scores → ask user to choose
+- Zero keyword matches → place in 0-Inbox/fleeting/
+  → Report: "无法自动分类 [unit-title]，已放入 0-Inbox/fleeting/"
+```
 
 ---
 
 ## Phase 4: DE-DUPLICATE
 
-For each unit, check if similar content already exists in the vault:
-1. Search for exact title match in `~/KnowledgeBase/`
-2. Search for semantic overlap (same paper title, same concept name)
-3. If match found → use `resolve` action (see `references/conflict-resolution.md`) to present comparison and decision matrix:
-   - **Replace**: new note is significantly more complete (longer + more links)
-   - **Merge**: complementary content, combine sections
-   - **Skip**: existing note is already `polished`
-   - **Keep both**: same title but different topic/area → save with `_v2` suffix
-4. For batch operations: when user selects APPLY-TO-ALL-SIMILAR, auto-apply the same decision rule to subsequent similar conflicts
+```
+For each unit at its target location:
+
+1. Check if a file with the same name exists at the target path
+2. If yes → present both to user:
+   "目标位置已存在 [existing-note]。新笔记: [N] 字, 旧笔记: [M] 字。
+    合并 / 替换 / 保留两份 / 跳过？"
+3. If no → create new note
+4. If similar topic but different name → check first 100 chars of both,
+   ask user if they should be merged
+```
+
+No pre-computed decision matrix. Ask the user. They know better than any heuristic.
 
 ---
 
 ## Phase 5: FORMAT
 
-Apply standard formatting:
-- Add YAML frontmatter with `tags`, `created` date, `source` reference
-- Use Obsidian `[[wikilinks]]` for internal references
-- Add `# Headers` in proper hierarchy (H1 title, H2 sections)
-- Normalize whitespace (single blank line between sections)
-- Add `## 来源` section linking back to original file
+Apply standard Obsidian formatting:
 
-**Tag assignment:**
-- `#type/paper` for paper notes
-- `#type/concept` for concept/definition notes
-- `#type/experiment` for experiment logs
-- `#type/daily` for journal entries
-- `#area/quantization`, `#area/diffusion`, etc.
-- `#technique/ptq`, `#technique/mxfp4`, etc. based on content
-- `#status/draft` as default (user polishes later)
+```
+1. YAML frontmatter:
+   - tags: derived from classification + content
+   - created: current date
+   - source: original file name
+2. [[wikilinks]] for all internal references
+3. H1 title, H2 sections
+4. Single blank line between sections
+5. ## 来源 section linking back to source file
+```
+
+### Tag assignment
+
+| Note content | Tags to add |
+|-------------|-------------|
+| Paper discussion | `#type/paper` |
+| Concept explanation | `#type/concept` |
+| Experiment data | `#type/experiment` |
+| Daily reflection | `#type/daily` |
+| From chat-export | `#status/draft` |
+| From research-report | `#status/draft` (or polished only if deepen passed) |
+| From casual-note | `#status/draft` |
+| Belongs to domain X | `#area/<kebab-X>` |
+| Discusses specific technique | `#technique/<name>` (detect from content keywords) |
 
 ---
 
 ## Phase 6: PLACE
 
-Write each unit to its target location:
-- Create `.md` file with kebab-case filename (Chinese content: use concise Chinese filename)
-- Update relevant `_index.md` MOC files with links to new notes
-- If linking to an existing concept note that doesn't exist yet, create a stub with `#status/stub`
-
-**Naming conventions:**
-- English concepts: `Block-Rotation.md`, `MXFP4-Format.md`
-- Chinese notes: `低光照增强综述.md`, `扩散模型加速采样.md`
-- Papers: `FirstAuthor-Year-ShortTitle.md` or use arXiv ID
+```
+1. Write .md to target directory
+2. If target directory doesn't exist → create it (including parent paths)
+3. Update parent _index.md MOC:
+   - For 1-Projects/<Project>/ and 2-Areas/<Area>/: add [[link]] to the new note
+   - Group links under appropriate H2 headings (概念笔记, 实验记录, etc.)
+4. If [[wikilinks]] in the note point to non-existent targets:
+   - For concrete concepts from paper/code → create a stub
+   - For vague references → remove the link, add a ## 待办 bullet
+```
 
 ---
 
 ## Phase 7: REPORT
 
-Summarize:
-- Files processed: N
-- Notes created: N (by PARA category)
-- Notes merged: N (with existing note paths)
-- Notes skipped: N (reason)
-- MOC files updated: N
-- Stub notes created: N
+```
+Output:
+  源文件: [N] 个
+  识别类型: chat-export [n] / research-report [n] / casual-note [n]
+  创建笔记: [N] 篇
+  合并到已有笔记: [N] 篇
+  跳过: [N] 篇 (原因: ...)
+  更新 MOC: [N] 个
+  需要用户补充参考: [N] 篇 (列出)
+```
 
 ---
 
-## Special Handlers
+## Templates
 
-### Chat Export Handler
+When creating notes, use these templates (from `templates/`):
 
-For files like `chat_export_*.md`:
-- Identify Q&A boundaries (look for timestamp/user prefixes)
-- Extract only the assistant/answer content
-- Group by topic, then apply Phase 2-6 per topic
-- Common patterns: `**User**: ...`, `> ...`, `## ...`
-
-### Multi-Concept Long File Handler
-
-For files >200 lines with mixed content:
-- Split into sections by `## Header` or topic boundaries
-- Process each section as a separate unit
-- Original file can be archived to `4-Archives/`
-
-### Code Snippet Handler
-
-For notes containing code blocks:
-- Extract standalone code to `3-Resources/Code-Tools/`
-- Add `## 运行方式` section
-- Link back to the project it belongs to
+- **Concept (draft/stub):** `tpl-concept.md` — `## 定义` / `## 为什么重要`
+- **Concept (deepened/polished):** `tpl-concept-deepened.md` — 5-layer structure
+- **Paper note:** `tpl-paper-note.md` — arxiv, authors, one-sentence summary, method, results
+- **Experiment log:** `tpl-experiment.md` — config, results table, analysis
 
 ---
-
-## KnowledgeBase Structure Reference
-
-```
-~/KnowledgeBase/
-├── _MOCs/           # Global indexes (Home, Code-Index, Paper-Reading-List, Tag-Index)
-├── _templates/      # Note templates (tpl-project-index, tpl-codebase, tpl-paper-note, etc.)
-├── _attachments/    # Images, PDFs
-├── 0-Inbox/         # fleeting/ + daily/
-├── 1-Projects/      # 6 active projects (DartQuant-Diffusion, PTQ4DiT, TinyFusion, Wan-Quantization, LLIEDiff, DiTQuant-Validation) + each has methods/ experiments/ _index.md Codebase.md
-├── 2-Areas/         # Quantization, Diffusion-Models, Low-Level-Vision, Model-Compression, Career
-├── 3-Resources/     # Papers/(quantization,diffusion,low-light,model-compression,others), Code-Tools, Presentations, Tutorials
-└── 4-Archives/      # AdamOptimizer-Demo, DuQuant-v2
-```
 
 ## Tag System
 
 | Category | Tags |
 |----------|------|
-| Note type | `#type/paper` `#type/concept` `#type/experiment` `#type/moc` `#type/daily` `#type/codebase` |
-| Area | `#area/quantization` `#area/diffusion` `#area/vision` `#area/systems` |
-| Technique | `#technique/ptq` `#technique/qat` `#technique/mxfp4` `#technique/pruning` `#technique/block-rotation` |
-| Status | `#status/active` `#status/draft` `#status/polished` `#status/toread` `#status/archived` `#status/stub` |
-| Other | `#repo` |
+| Note type | `#type/paper` `#type/concept` `#type/experiment` `#type/moc` `#type/daily` |
+| Status | `#status/draft` `#status/stub` `#status/polished` `#status/toread` `#status/archived` |
+| Area | Generated from `domains[]`: `#area/quantization` `#area/diffusion` etc. |
+| Technique | Detected from content: `#technique/ptq` `#technique/mxfp4` `#technique/hadamard` etc. |
 
-## Template Alignment
-
-- `tpl-concept.md` uses `## 定义` / `## 为什么重要` — use this for **initial/draft** concept notes (status/draft)
-- Deepened concept notes use `## 1. 动机` / `## 2. 机制` / ... `## 5. 系统性` — use this for **polished** concept notes (status/polished)
-- The `deepen` action transforms draft template format → 5-layer polished format
-
-## Examples
-
-### Example 1: Chat export → concept note
-
-**Input: Chat export about MXFP4**
-```
-**User**: what is mxfp4?
-**Assistant**: MXFP4 is a 4-bit floating point format with E2M1 mantissa and E8M0 shared block scale...
-```
-
-**Output: `2-Areas/Quantization/MXFP4-Format.md`**
-```markdown
----
-tags: [type/concept, area/quantization, technique/mxfp4, status/draft]
-created: 2026-06-01
-source: chat_export_20260519_233042.md
 ---
 
-# MXFP4 格式
+## KnowledgeBase Structure
 
-## 定义
-MXFP4 是 4-bit 浮点格式，采用 E2M1 mantissa + E8M0 共享 block scale...
-
-## 关联概念
-- [[Block-Rotation]]
-- [[PTQ-vs-QAT]]
-
-## 来源
-从聊天记录提取: chat_export_20260519_233042.md
 ```
-
-### Example 2: Paper note import
-
-**Input: arXiv paper PDF notes**
-```
-Paper: PTQ4DiT — Post-Training Quantization for Diffusion Transformers
-Key idea: block-wise reconstruction with timestep shuffling
-Result: W4A4 achieves <0.5 FID degradation on ImageNet 256
-```
-
-**Output: `3-Resources/Papers/quantization/ptq4dit.md`**
-```markdown
----
-tags: [type/paper, area/quantization, technique/ptq, status/toread]
-arxiv: 2405.xxxxx
-authors: ...
-year: 2024
-topic: quantization
----
-
-# PTQ4DiT
-
-## 一句话总结
-Block-wise reconstruction for DiT PTQ with timestep-aware calibration.
-
-## 核心方法
-- Timestep shuffling in calibration
-- Block-level reconstruction with MSE loss
-- ...
-
-## 与我的研究关联
-- 关联项目: [[../../1-Projects/PTQ4DiT/_index|PTQ4DiT]]
-- 关联概念: [[Block-Reconstruction]], [[Timestep-Dependent-Activations]]
-```
-
-### Example 3: Experiment log import
-
-**Input: Experiment log**
-```
-Experiment: tiny_learned_mxfp4_experiment.py
-Config: w4a4, block_size=32, TinyDiT model
-Results: learned_block_w4a4 MSE=0.0023 vs baseline RTN MSE=0.0081
-```
-
-**Output: `1-Projects/DiTQuant-Validation/experiments/tiny-learned-mxfp4-results.md`**
-```markdown
----
-tags: [type/experiment, area/quantization, technique/mxfp4, technique/block-rotation, status/draft]
-created: 2026-06-01
-source: ~/DiTQuantValidation/src/dit_quant_validation/tiny_learned_mxfp4_experiment.py
----
-
-# Tiny Learned MXFP4 Experiment
-
-## 配置
-- Model: TinyDiT
-- Precision: w4a4
-- Block size: 32
-
-## 结果
-| Method | MSE |
-|--------|-----|
-| RTN (baseline) | 0.0081 |
-| Block Hadamard | 0.0042 |
-| Learned Block | 0.0023 |
-
-## 关联概念
-- [[MXFP4-Format]]
-- [[Block-Rotation]]
-- [[../../../2-Areas/Quantization/Adaptive-Rounding|Adaptive Rounding]]
+~/KnowledgeBase/                (value of note-merge.json vault)
+├── .obsidian/                  Obsidian config
+├── _templates/                 Note templates
+├── _MOCs/                      Global indexes
+├── _attachments/               Images, PDFs
+├── 0-Inbox/
+│   ├── fleeting/               Uncategorized
+│   └── daily/                  Daily journals
+├── 1-Projects/
+│   └── <Project>/              _index.md, Codebase.md, methods/, experiments/
+├── 2-Areas/
+│   └── <Domain>/               (from domains[] in config) _index.md + concept .md files
+├── 3-Resources/
+│   ├── Papers/<topic>/
+│   ├── Code-Tools/
+│   ├── Presentations/
+│   └── Tutorials/
+└── 4-Archives/
 ```

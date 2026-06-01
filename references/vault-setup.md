@@ -1,82 +1,92 @@
-# Obsidian Vault Setup
+# Vault Setup
 
-Detailed instructions for creating a PARA+Zettelkasten Obsidian vault from scratch.
+Creating a new Obsidian PARA+Zettelkasten vault. Triggered by `init-vault`.
 
 ---
 
-## Creating a Vault in Obsidian
+## Interactive Configuration Flow
 
-### Via Obsidian App (GUI)
+When the user says `init-vault`, ask these questions in order. Do not proceed until each is answered.
 
-1. Open Obsidian → click "Open another vault" (bottom-left)
-2. Click "Create new vault"
-3. Name: `KnowledgeBase`, Location: `~` (home directory)
-4. After creation: Settings → Files & Links → set:
-   - "Default location for new notes": "In the folder specified below"
-   - "Folder to create new notes in": `0-Inbox/fleeting`
-   - "Attachment folder path": `_attachments`
-   - Turn ON "Automatically update internal links"
-
-### Via `init-vault` (skill action)
+### Q1: Vault path
 
 ```
-init-vault [path]
+"Vault 路径？" [默认: ~/KnowledgeBase]
 ```
 
-If no path given, defaults to `~/KnowledgeBase/`. This creates all directories, writes `.obsidian/` config, and injects templates. No Obsidian app required for initialization — it just creates the directory structure and config files.
+If the path already exists and is not empty, warn and ask for confirmation.
+
+### Q2: Research domains
+
+```
+"研究领域？（用逗号分隔，例如: quantization, diffusion, low-level-vision）"
+```
+
+Store in `note-merge.json` as `domains[]`. These drive:
+
+- `2-Areas/<Domain>/` directory creation
+- Keyword→directory mapping for classification
+- `#area/<kebab-domain>` tags
+
+### Q3: Source code repositories
+
+```
+"源码仓库路径？（用逗号分隔，例如: ~/TinyFusion, ~/DiTQuantValidation）
+ 这些路径用于 deepen 时搜索源码实现。"
+```
+
+Store in `note-merge.json` as `source_repos[]`. Do not verify paths exist at this point — user might create repos later.
+
+### Q4: Primary language
+
+```
+"主要使用语言？"
+  1) zh-CN（中文为主，文件名用中文）
+  2) en（英文为主，文件名用 kebab-case）
+  3) mixed（中英混排，按文件内容判断）
+```
+
+Store in `note-merge.json` as `language`.
 
 ---
 
 ## Directory Skeleton
 
+After configuration, create:
+
 ```
-~/KnowledgeBase/
+<vault>/
 ├── .obsidian/
 │   ├── app.json
 │   ├── appearance.json
 │   └── core-plugins.json
 ├── _MOCs/
-│   ├── Home.md                  # Vault home / dashboard
-│   ├── Code-Index.md            # All codebases across projects
-│   ├── Paper-Reading-List.md    # Aggregated paper references
-│   └── Tag-Index.md             # Tag-based index
+│   ├── Home.md
+│   ├── Code-Index.md
+│   ├── Paper-Reading-List.md
+│   └── Tag-Index.md
 ├── _templates/
-│   ├── tpl-concept.md
-│   ├── tpl-concept-deepened.md
-│   ├── tpl-paper-note.md
-│   ├── tpl-experiment.md
-│   ├── tpl-project-index.md
-│   ├── tpl-area-index.md
-│   ├── tpl-daily.md
-│   ├── tpl-codebase.md
-│   ├── tpl-stub.md
-│   └── tpl-chat-extract.md
-├── _attachments/                # Images, PDFs, etc.
+│   └── (copied from skill templates/)
+├── _attachments/
+├── note-merge.json              ← written here
 ├── 0-Inbox/
-│   ├── fleeting/                # Uncategorized quick captures
-│   └── daily/                   # Daily journal entries
-├── 1-Projects/                  # Active projects
-│   └── <ProjectName>/
-│       ├── _index.md            # Project MOC
-│       ├── Codebase.md          # Codebase map
-│       ├── methods/             # Method/algorithm notes
-│       └── experiments/         # Experiment logs
-├── 2-Areas/                     # Research areas (long-term)
-│   └── <AreaName>/
-│       ├── _index.md            # Area MOC
-│       └── <Concept>.md         # Atomic concept notes
-├── 3-Resources/                 # Reference material
+│   ├── fleeting/
+│   └── daily/
+├── 1-Projects/
+├── 2-Areas/
+│   └── <each domain>/           ← per Q2
+│       └── _index.md
+├── 3-Resources/
 │   ├── Papers/
-│   │   └── <topic>/            # Paper notes organized by topic
 │   ├── Code-Tools/
 │   ├── Presentations/
 │   └── Tutorials/
-└── 4-Archives/                  # Completed/archived projects
+└── 4-Archives/
 ```
 
 ---
 
-## .obsidian Config Files
+## .obsidian Config
 
 ### app.json
 
@@ -92,33 +102,9 @@ If no path given, defaults to `~/KnowledgeBase/`. This creates all directories, 
 
 ### core-plugins.json
 
-```json
-{
-  "file-explorer": true,
-  "global-search": true,
-  "graph": true,
-  "backlink": true,
-  "outgoing-link": true,
-  "tag-pane": true,
-  "page-preview": true,
-  "daily-notes": true,
-  "templates": true,
-  "note-composer": true,
-  "command-palette": true,
-  "markdown-importer": true,
-  "outline": true,
-  "word-count": true,
-  "file-recovery": true,
-  "starred": false,
-  "random-note": false,
-  "zk-prefixer": false,
-  "slides": false,
-  "audio-recorder": false,
-  "workspaces": false,
-  "publish": false,
-  "sync": false
-}
-```
+Enable: file-explorer, global-search, graph, backlink, outgoing-link, tag-pane, page-preview, daily-notes, templates, note-composer, command-palette, markdown-importer, outline, word-count, file-recovery.
+
+Disable: starred, random-note, zk-prefixer, slides, audio-recorder, workspaces, publish, sync.
 
 ### appearance.json
 
@@ -132,72 +118,76 @@ If no path given, defaults to `~/KnowledgeBase/`. This creates all directories, 
 
 ---
 
-## Files Created by `init-vault`
+## _MOCs Initial Content
 
-The `init-vault` action writes the following:
+### Home.md
 
-| File | Source |
-|------|--------|
-| `.obsidian/app.json` | Generated from inline config |
-| `.obsidian/core-plugins.json` | Generated from inline config |
-| `.obsidian/appearance.json` | Generated from inline config |
-| `_templates/*.md` | Copied from `templates/` directory in skill |
-| `_MOCs/Home.md` | Minimal vault home with dataview query blocks |
-| `_MOCs/Code-Index.md` | Empty codebase index |
-| `_MOCs/Paper-Reading-List.md` | Empty paper list |
-| `_MOCs/Tag-Index.md` | Empty tag index |
-| `0-Inbox/fleeting/.gitkeep` | Placeholder |
-| `0-Inbox/daily/.gitkeep` | Placeholder |
-| `_attachments/.gitkeep` | Placeholder |
-
-Directories `1-Projects/`, `2-Areas/`, `3-Resources/`, `4-Archives/` are created empty. User adds their projects and areas over time.
-
+```markdown
+---
+tags: [type/moc, status/active]
+created: <today>
 ---
 
-## Obsidian Conventions Enforced by This Skill
+# 知识库首页
 
-### Wikilinks
+## 项目 (1-Projects)
 
-```
-# CORRECT (Obsidian native):
-[[Block-Rotation]]
-[[MXFP4-Format|MXFP4 格式]]   # With display alias
-[[../2-Areas/Quantization/MXFP4-Format]]  # Relative path
+## 领域 (2-Areas)
 
-# WRONG (don't use):
-[Block-Rotation](Block-Rotation.md)
-[Block-Rotation](./Block-Rotation.md)
+## 最近笔记
 ```
 
-### Frontmatter
+### _index.md for each domain
 
-```yaml
+For each domain D in `note-merge.json.domains[]`:
+
+```markdown
 ---
-tags: [type/concept, area/quantization, technique/mxfp4, status/draft]
-created: 2026-06-01
-source: chat_export_20260519.md
+tags: [type/moc, area/<kebab-D>]
+created: <today>
 ---
+
+# <D>
+
+## 核心概念
+
+## 子领域
+
+## 关联项目
+
+## 关键论文
 ```
 
-Every `.md` file MUST have `tags:` and `created:` at minimum. Additional fields (arxiv, authors, source, repo_path, etc.) depend on note type.
+---
 
-### MOC (_index.md) Files
+## Templates Installation
 
-Every `1-Projects/<Project>/` and `2-Areas/<Area>/` must have a `_index.md` file. New notes created in those directories are automatically added to the MOC.
+Copy these from the skill's `templates/` directory into `<vault>/_templates/`:
 
-### Tags
+| Template | For |
+|----------|-----|
+| `tpl-concept.md` | Draft concept notes |
+| `tpl-concept-deepened.md` | Polished 5-layer concept notes |
+| `tpl-paper-note.md` | Paper reading notes |
+| `tpl-experiment.md` | Experiment logs |
+| `tpl-project-index.md` | Project _index.md MOC |
 
-See `references/merge-workflow.md` (Section: Tag System) for the full taxonomy.
+The vault's existing templates in `~/.config/opencode/skills/note-merge/templates/` are copied as-is. If a vault-level `tpl-project-index.md` exists separately, keep it.
 
 ---
 
-## Migrating an Existing Folder into an Obsidian Vault
+## Completion
 
-If the user already has a directory of `.md` files (not yet an Obsidian vault):
+After setup, report:
 
-1. `init-vault` creates the `.obsidian/` config in that directory
-2. The skill re-classifies existing `.md` files into the PARA structure
-3. `[[wikilinks]]` are added/updated
-4. `_index.md` MOC files are generated based on directory contents
+```
+Vault initialized at: <path>
+Domains: <list>
+Source repos: <list>
+Language: <lang>
 
-Use `batch re-index` after migrating to regenerate all MOCs.
+Open in Obsidian:
+  obsidian://open?vault=<vault-name>
+
+  or: Obsidian app → Open folder as vault → <path>
+```
