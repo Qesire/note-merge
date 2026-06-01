@@ -18,13 +18,62 @@ Report the inventory to the user before proceeding.
 
 ## Phase 2: EXTRACT
 
-For each source file, extract **atomic knowledge units**. Rules:
-- One concept/topic per unit
+For each source file, extract **atomic knowledge units**. The extraction quality determines everything downstream — too coarse and concepts stay buried; too fine and the vault fragments into noise.
+
+### 2.1 Definition of "Atomic Knowledge Unit"
+
+An atomic knowledge unit = a self-contained piece of knowledge that can answer at least one "why" or "how" question independently.
+
+**Test:** imagine this unit as a standalone .md file. Can a reader understand it without reading 3 other things first? If yes → atomic. If no → it depends on another unit, decide whether to merge or cross-link.
+
+### 2.2 Granularity Decision Table
+
+| Source file type | How to split | Typical yield | Warning signs of wrong granularity |
+|-----------------|-------------|---------------|-------------------------------------|
+| **Paper note** (full paper dump, 200+ lines) | One unit per distinct method/algorithm described; one unit per key result/claim; remove intro/related-work boilerplate | 3-6 concept units + 1 experiment unit | **Too coarse:** a single 80-line unit mixing method + result + comparison. **Too fine:** 15 one-paragraph units about minor details |
+| **Chat export** with multiple Q&A topics | One unit per answered topic; merge adjacent Q&A about same topic | 2-5 concept units per chat file | **Too coarse:** lumping all answers into one giant note. **Too fine:** one unit per sentence |
+| **Experiment log** / script output | One unit = one experiment run with config + result | 1 unit (or 1 per variant if configs differ) | **Too fine:** separating config from results. **Too coarse:** mixing two different experiments |
+| **Lecture/Presentation notes** | One unit per slide group that forms a coherent topic | 3-8 concept units per lecture | **Too coarse:** entire lecture as one note |
+| **Mixed scratch file** (thoughts + links + code) | Extract each distinct idea; code blocks go to Code-Tools separately | Variable | Leave code inline if it illustrates a concept; extract to Code-Tools only if it's a reusable script |
+| **Tutorial walkthrough** | One unit per step that teaches a distinct technique | 2-5 concept + 1-2 code-tool units | |
+
+### 2.3 Concept Boundary Heuristics
+
+When deciding whether two topics are "one concept" or "two concepts":
+
+```
+MERGE into one unit when:
+  - They answer the same "why" question
+  - One is a direct prerequisite of the other and neither is independently useful
+  - Together < 200 words — splitting would create two stubs
+
+SPLIT into two units when:
+  - Each could be the answer to a different "how does X work?" question
+  - One is technique-level (e.g., "Block Rotation") and the other is theory-level (e.g., "Orthogonal Transforms in Quantization")
+  - Each has ≥ 100 words of unique content
+  - They are used in different project contexts
+```
+
+### 2.4 Extraction Rules
+
+For all source types:
 - Strip conversational filler (greetings, meta-commentary, "let me think...")
 - Keep: factual statements, technical insights, code patterns, paper references, experimental results, questions/todos
 - Discard: pure chat boilerplate, emoji-only lines, duplicate adjacent lines
+- **If extraction yields 0 units:** source file has no extractable knowledge. Report and skip — do NOT fabricate content.
 
-For **chat exports**: identify Q&A pairs, extract the answer/content, discard the question if it adds no value.
+For **chat exports** specifically:
+- Identify Q&A boundaries (look for timestamp/user prefixes)
+- Extract the answer/content, discard the question if it adds no value
+- If a Q&A pair is about a concept already covered by another pair, merge them into one unit
+
+### 2.5 Extraction Quality Self-Check
+
+Before proceeding to Phase 3, verify:
+- [ ] Every extracted unit passes the "standalone .md file" test
+- [ ] No unit is < 50 words unless it's a code snippet or config block
+- [ ] No unit is > 500 words — if so, re-check if it should be split
+- [ ] Units are named with a temporary descriptive title (used in Phase 3 classification)
 
 ---
 

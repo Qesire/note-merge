@@ -307,5 +307,6 @@ Load these as needed based on the action:
 | `batch`, `track` | `references/batch-operations.md` — checkpoint mechanism, sub-action details, track metrics schema |
 | `resolve` | `references/conflict-resolution.md` — decision matrix, comparison format, user interaction flow |
 | `init-vault` | `references/vault-setup.md` — directory skeleton, Obsidian config, template injection |
+| (all actions) | `references/edge-cases.md` — boundary cases: insufficient sources, contradictions, mixed-language, oversized files, missing wikilinks, classification deadlock |
 
 **Base directory:** `~/.config/opencode/skills/note-merge/`

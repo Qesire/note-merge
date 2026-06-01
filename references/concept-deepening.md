@@ -127,11 +127,64 @@ Every deepened note MUST include `[[links]]` to:
 
 ## Quality Gate
 
-Before marking a deepened note as complete, verify:
-- [ ] All 5 layers have non-trivial content (not placeholders)
-- [ ] Every claim in Layer 4 is backed by specific experiment name + metric
-- [ ] Every code reference in Layer 2 has exact file:line
-- [ ] Layer 3 compares at least 2 alternatives with concrete trade-offs
-- [ ] Layer 5 has at least 2 upstream and 2 downstream links
-- [ ] Tags updated to `status/polished`
-- [ ] Frontmatter includes `created` date and relevant `#technique/` tags
+Before marking a deepened note as `#status/polished`, verify every layer meets the following sufficiency standards. A claim is "sufficient" only if it meets the specific evidence bar below — vague or generic statements count as FAIL.
+
+### Per-Layer Sufficiency Thresholds
+
+| Layer | Minimum Requirement | How to Verify | Common Failures |
+|-------|--------------------|---------------|-----------------|
+| **L1 动机** | Must cite a SPECIFIC distribution property, data characteristic, or architecture constraint that makes this concept necessary. Must include at least one causal statement: "If X were removed, Y would degrade because Z." | Count causal statements: must have ≥ 1. Check if the property cited is concrete (e.g., "activation outliers in LayerNorm outputs") not generic (e.g., "quantization causes accuracy loss"). | "This solves the quantization error problem" — too vague. "Without block rotation, the per-channel variance in QKV projections (std=3.4) would be quantized unevenly, causing outlier channels to dominate MSE" — sufficient. |
+| **L2 机制** | Must have ≥ 1 file:line reference to actual source code. Pseudo-code must have ≥ 5 distinct steps showing data flow. Math→code mapping table must have ≥ 1 row. | Grep the note for `:\d+` pattern (file:line). Count pseudo-code steps. Count rows in math→code table. | Pseudo-code that is just "1. input → 2. process → 3. output" — 5 steps minimum. No file:line reference at all — code trace was not done. |
+| **L3 设计理由** | Must compare ≥ 2 named alternatives with ≥ 1 specific, quantified trade-off each. "Why this parameter value" must be answered for at least one key parameter. | Count alternatives listed by name. Check each has a concrete trade-off (number, condition, or cost statement). | "A is better than B" without saying WHY — fail. "block_size=32 because it's a power of 2" — marginal, add hardware alignment reasoning. |
+| **L4 证据** | Must cite ≥ 1 specific experiment by name with ≥ 1 numeric metric from actual results. May NOT use phrases like "效果显著", "明显提升", or any unsourced qualitative judgment as evidence. | Grep for digits (MSE values, FID scores, percentage changes). Check if values come from a named experiment script or log. | "实验表明效果很好" — fail, no numbers. "MSE improved by 0.0023 (from 0.0081 RTN to 0.0058 w/ rotation)" — sufficient. |
+| **L5 耦合** | Must have ≥ 2 upstream links (concepts this depends on) AND ≥ 2 downstream links (concepts depending on this). All target files must exist (no broken wikilinks). Upstream/downstream relationship must be EXPLAINED, not just listed. | Count `[[upstream]]` and `[[downstream]]` links. Verify each target file exists. Check for explanation text (at minimum one sentence per link). | Just listing `[[ConceptA]]` under "上游" with no text explaining the relationship — fail. Links to non-existent files — fail. |
+
+### Final Quality Checklist
+
+Before accepting a deepened note, verify ALL of the following:
+
+```
+Layer 1 (动机):
+  [ ] Contains a specific, named distribution/architecture/data property
+  [ ] Contains at least one causal "if removed, then..." statement
+  [ ] Does NOT use the generic phrase "量化误差" or "accuracy loss" without qualification
+
+Layer 2 (机制):
+  [ ] At least 1 file:line reference to actual source code (e.g., mxfp4.py:128)
+  [ ] Pseudo-code has at least 5 distinct steps with clear data flow
+  [ ] At least 1 row in the math formula → code mapping table
+
+Layer 3 (设计理由):
+  [ ] At least 2 named alternatives are compared (e.g., "Hadamard vs QR-Orth vs Random")
+  [ ] At least 1 trade-off has a specific, quantified reason (not just "better")
+  [ ] At least 1 key parameter value is justified
+
+Layer 4 (证据):
+  [ ] At least 1 named experiment cited (script or log file name)
+  [ ] At least 1 numeric metric from actual results (MSE, FID, SQNR, speedup %, etc.)
+  [ ] NO unsourced qualitative claims ("效果显著", "明显改善", "greatly improves")
+
+Layer 5 (耦合):
+  [ ] At least 2 upstream [[wikilinks]], each with ≥ 1 sentence explaining the relationship
+  [ ] At least 2 downstream [[wikilinks]], each with ≥ 1 sentence explaining the relationship
+  [ ] NO broken wikilinks (all target files exist)
+
+Meta:
+  [ ] Tags include status/polished
+  [ ] Frontmatter includes created date
+  [ ] Frontmatter includes at least one #technique/ tag
+  [ ] Frontmatter includes deepened: date
+```
+
+### Rejection Protocol
+
+If ANY layer fails sufficiency:
+
+```
+1. Do NOT mark as status/polished
+2. Do NOT fabricate missing evidence
+3. Keep status as draft
+4. Add a ## 深化待办 section listing exactly what's missing:
+   - for each failed layer, one bullet describing what data/reading is needed
+5. Report to user: "深化未完成: Layer {N} 缺少 {具体缺少的内容}。已保留为 draft，并在笔记中列出待办。"
+```
