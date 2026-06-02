@@ -19,7 +19,7 @@ If the path already exists and is not empty, warn and ask for confirmation.
 ### Q2: Research domains
 
 ```
-"研究领域？（用逗号分隔，例如: quantization, diffusion, low-level-vision）"
+"研究领域？（用逗号分隔，例如: ecology, genomics, early-modern-history）"
 ```
 
 Store in `note-merge.json` as `domains[]`. These drive:
@@ -31,7 +31,7 @@ Store in `note-merge.json` as `domains[]`. These drive:
 ### Q3: Source code repositories
 
 ```
-"源码仓库路径？（用逗号分隔，例如: ~/TinyFusion, ~/DiTQuantValidation）
+"源码仓库路径？（用逗号分隔，例如: ~/<repo-1>, ~/<repo-2>）
  这些路径用于 deepen 时搜索源码实现。"
 ```
 
@@ -126,6 +126,7 @@ Disable: starred, random-note, zk-prefixer, slides, audio-recorder, workspaces, 
 ---
 tags: [type/moc, status/active]
 created: <today>
+modified: <today>
 ---
 
 # 知识库首页
@@ -145,6 +146,7 @@ For each domain D in `note-merge.json.domains[]`:
 ---
 tags: [type/moc, area/<kebab-D>]
 created: <today>
+modified: <today>
 ---
 
 # <D>

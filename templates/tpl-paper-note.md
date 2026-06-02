@@ -4,6 +4,10 @@ arxiv:
 authors:
 year:
 topic:
+created:
+modified:
+source:
+source_snapshot:
 ---
 
 # {{title}}

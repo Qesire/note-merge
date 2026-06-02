@@ -4,6 +4,9 @@ project:
 script:
 config:
 created:
+modified:
+source:
+source_snapshot:
 ---
 
 # {{title}}
@@ -15,20 +18,20 @@ created:
 ## 配置
 
 ```yaml
-model:
-precision:
-block_size:
-dataset:
-batch_size:
-epochs:
-learning_rate:
+subject:
+setting_1:
+setting_2:
+data_source:
+setting_3:
+iterations:
+setting_4:
 ```
 
 ## 结果
 
 | 方法/配置 | 指标1 | 指标2 | 备注 |
 |-----------|-------|-------|------|
-| baseline | | | |
+| reference | | | |
 | | | | |
 | | | | |
 

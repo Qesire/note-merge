@@ -2,6 +2,8 @@
 
 Apply the 5-layer analytical framework when the user asks to deepen existing concept notes (深化笔记, 深挖).
 
+**Batch mode:** `deepen --all-stubs` deepens all `#status/stub` notes that pass the reference threshold, one at a time. Report which were deepened and which were skipped (with reason). `deepen --area <domain>` deepens stubs within a specific `2-Areas/<domain>/` only.
+
 This framework is **domain-agnostic**. It works for any knowledge domain — sciences, engineering, humanities, arts, business — as long as the concept note has traceable references (see Layer checks below). The examples in this document are illustrative; adapt the concrete verification methods to the domain of the note being deepened.
 
 ---
@@ -58,9 +60,10 @@ Step 4: REWRITE — restructure note with 5-layer headings, preserving all refer
        │
        ▼
 Step 5: LINK — add [[wikilinks]] to upstream/downstream concept notes
-       │
-       ▼
+        │
+        ▼
 Step 6: TAG — update status from stub/draft → polished
+        Update modified: date in frontmatter to today
 ```
 
 ---
@@ -157,10 +160,10 @@ Before marking a deepened note as `#status/polished`, verify every layer meets t
 
 | Layer | Minimum Requirement | How to Verify | Common Failures |
 |-------|--------------------|---------------|-----------------|
-| **L1 动机** | Must cite a SPECIFIC problem, context, or constraint that makes this concept necessary. Must include at least one causal statement: "If X were removed/unavailable, Y would break/degrade because Z." | Count causal statements: must have ≥ 1. Check if the cited problem is concrete (e.g., "gradient instability in layer 12 of this architecture") not generic (e.g., "training is hard"). | "This solves the error problem" — too vague. "Without this mechanism, the variance across channels (measured at σ=3.4) would cause uneven behavior, corrupting downstream outputs" — sufficient. |
+| **L1 动机** | Must cite a SPECIFIC problem, context, or constraint that makes this concept necessary. Must include at least one causal statement: "If X were removed/unavailable, Y would break/degrade because Z." | Count causal statements: must have ≥ 1. Check if the cited problem is concrete (e.g., "instability in component X under condition Y") not generic (e.g., "the process is difficult"). | "This solves the error problem" — too vague. "Without this mechanism, the output variance (measured at σ=3.4) would cause uneven behavior, corrupting downstream outputs" — sufficient. |
 | **L2 机制** | Must have ≥ 1 specific location reference to the primary source (file:line, paper section, book page, timestamp). Step-by-step description must have ≥ 5 distinct steps showing data/state flow. Formal-to-concrete mapping table must have ≥ 1 row. | Grep the note for location references (file:line patterns, section numbers, page numbers). Count distinct steps. Count mapping rows. | "1. input → 2. process → 3. output" — 5 steps minimum. No location reference at all — source trace was not done. |
 | **L3 设计理由** | Must compare ≥ 2 named alternatives with ≥ 1 specific, reasoned trade-off each. "Why this parameter value" must be answered for at least one key parameter or design choice. | Count alternatives listed by name. Check each has a concrete trade-off (number, condition, or cost statement). | "A is better than B" without saying WHY — fail. "threshold=0.5 was chosen because it balances precision (0.87) and recall (0.82) on the validation set" — sufficient. |
-| **L4 证据** | Must cite ≥ 1 specific piece of evidence by name (experiment, paper, dataset, case) with ≥ 1 concrete result (numeric metric, documented finding, source quote). May NOT use phrases like "效果显著", "明显提升", or any unsourced qualitative judgment as evidence. | Check if evidence source is named. Check if result is concrete. | "实验表明效果很好" — fail, no named source, no numbers. "On the XYZ benchmark, accuracy improved from 0.72 to 0.81 (±0.02, n=5 runs)" — sufficient. |
+| **L4 证据** | Must cite ≥ 1 specific piece of evidence by name (experiment, paper, dataset, case) with ≥ 1 concrete result (numeric metric, documented finding, source quote). May NOT use phrases like "效果显著", "明显提升", or any unsourced qualitative judgment as evidence. | Check if evidence source is named. Check if result is concrete. | "实验表明效果很好" — fail, no named source, no numbers. "On the XYZ benchmark, the score improved from 0.72 to 0.81 (±0.02, n=5 runs)" — sufficient. |
 | **L5 耦合** | Must have ≥ 2 upstream links (concepts this depends on) AND ≥ 2 downstream links (concepts depending on this). All target files must exist (no broken wikilinks). Each relationship must be EXPLAINED with ≥ 1 sentence. | Count `[[upstream]]` and `[[downstream]]` links. Verify each target file exists. Check for explanation text. | Just listing `[[ConceptA]]` under "上游" with no text explaining the relationship — fail. Links to non-existent files — fail. |
 
 ### Final Quality Checklist
@@ -196,6 +199,7 @@ Layer 5 (耦合):
 Meta:
   [ ] Tags include status/polished
   [ ] Frontmatter includes created date
+  [ ] Frontmatter includes modified date (updated to today)
   [ ] Frontmatter includes at least one #technique/ or #topic/ tag relevant to the domain
   [ ] Frontmatter includes deepened: date
 ```

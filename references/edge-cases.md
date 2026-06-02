@@ -2,6 +2,8 @@
 
 Boundary scenarios and their handling protocols. Load this when any action encounters input that doesn't fit the normal flow.
 
+For `check` and `archive` command specifications, see `references/vault-check.md`.
+
 ---
 
 ## 1. Insufficient Source Material
@@ -46,6 +48,7 @@ This check is on the note's CURRENT state, not its original source type. A note 
 - Offer only: append / create-versioned-copy / skip.
 - If appending, add a provenance heading: ## 新增自 <source_snapshot>
 - Preserve both the old note's reasoning context and the new source's reasoning context.
+- Update modified: date in the existing note's frontmatter.
 - If the user explicitly says "replace", ask for confirmation and recommend versioned copy instead.
 ```
 

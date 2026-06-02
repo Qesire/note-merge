@@ -1,6 +1,9 @@
 ---
 tags: [type/moc, status/active]
 created:
+modified:
+source:
+source_snapshot:
 ---
 
 # {{title}}

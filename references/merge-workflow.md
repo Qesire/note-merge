@@ -44,7 +44,7 @@ Detect which organizational patterns are present in the file. A file can match z
 |---------|--------|-------------------|
 | **Q&A** | `**User**:` / `**Assistant**:` markers, timestamps, conversational turn-taking | Identify Q&A boundaries → group adjacent pairs by topic → preserve questions, constraints, uncertainty, failed attempts, decision rationale, and answer content together |
 | **Sections** | `## ` H2 headings, especially structured ones like `方法`, `结果`, `实验`, `Method`, `Results`, `Experiment` | Split at H2 boundaries. Each H2 section → one candidate unit. Merge adjacent short (<50 word) sections on the same topic |
-| **Experiment data** | Tables with numeric metrics (MSE, FID, PSNR, accuracy, etc.), config blocks (YAML/JSON), "baseline vs ours" comparison | Keep as experiment record. Config + results table stay together as one unit |
+| **Experiment data** | Tables with numeric metrics (error rate, score, etc.), config blocks (YAML/JSON), reference vs experimental comparison | Keep as experiment record. Config + results table stay together as one unit |
 | **Code blocks** | Fenced code blocks (```) | Keep inline if illustrating a concept. Extract standalone to `3-Resources/Code-Tools/` only if it's a reusable tool/script with no surrounding conceptual explanation |
 | **None detected** | Free-form prose, no Q&A markers, no H2 headings, no tables | Group by paragraph clusters. Do NOT force-split and do NOT flatten the author's thinking path. Each unit is a stub/draft |
 
@@ -73,8 +73,8 @@ Check whether the source file contains references to external, findable material
 
 | Signal | Examples | Ingest action |
 |--------|----------|--------------|
-| **arxiv / DOI / URL** | `arXiv:2405.xxxxx`, `https://doi.org/...`, `paper.pdf` | "这篇笔记引用了 [citation]。需要我拉取原文/元数据吗？" If yes → fetch; if no → record citation in `## 来源` |
-| **repo / file path** | `~/MyProject/impl.py`, `core_module.py:128` | "引用了 [path]。需要我读取代码吗？" If yes → read and incorporate |
+| **arxiv / DOI / URL** | `arXiv:<id>`, `https://doi.org/...`, `paper.pdf` | "这篇笔记引用了 [citation]。需要我拉取原文/元数据吗？" If yes → fetch; if no → record citation in `## 来源` |
+| **repo / file path** | `~/<repo>/<file>`, `<module>.py:<line>` | "引用了 [path]。需要我读取代码吗？" If yes → read and incorporate |
 | **experiment / evidence ref** | `run_benchmark.sh`, `results.json`, `experiment_log.txt` | "提到了 [name]。需要我查找相关数据吗？" If yes → search and attach |
 | **none** | No arxiv, path, URL, file name, experiment name | Skip reference pull. Resulting notes will be deepen-blocked until user provides references later |
 
@@ -121,7 +121,7 @@ Apply the extraction strategies identified in the structure check. Each matched 
 
 ```
 1. Identify config + results as one coherent unit
-2. Extract the experiment configuration (model, precision, hyperparams)
+2. Extract the experiment configuration (parameters, settings, hyperparams)
 3. Extract the results table with numeric metrics
 4. Keep them together — do NOT split config from results
 5. Add a placeholder ## 分析 section for user to fill
@@ -190,7 +190,7 @@ Generic keywords (always active):
 | Keywords | Target |
 |----------|--------|
 | 论文, paper, arxiv | 3-Resources/Papers/<topic>/ |
-| 实验, 测试, experiment, 结果, 精度, metric | 1-Projects/<project>/experiments/ |
+| 实验, 测试, experiment, 结果, 度量, metric | 1-Projects/<project>/experiments/ |
 | 方法, 算法, method, algorithm, 实现, 架构 | 1-Projects/<project>/methods/ |
 | 概念, 定义, 什么是, concept, definition | 2-Areas/<best-match-domain>/ |
 | 教程, tutorial, 入门, guide, 学习 | 3-Resources/Tutorials/ |
@@ -240,8 +240,9 @@ Apply standard Obsidian formatting:
 1. YAML frontmatter:
     - tags: derived from classification + content
     - created: current date
+    - modified: current date (same as created on first write)
     - source: original file name
-   - source_snapshot: vault-relative path to raw source snapshot
+    - source_snapshot: vault-relative path to raw source snapshot
 2. [[wikilinks]] for all internal references
 3. H1 title, H2 sections
 4. Single blank line between sections
@@ -260,6 +261,8 @@ Apply standard Obsidian formatting:
 | Belongs to domain X | `#area/<kebab-X>` |
 | Discusses specific technique | `#technique/<name>` (detect from content keywords) |
 | Default status | `#status/draft` |
+
+Note: `created:` and `modified:` are set to the same date on first write. Subsequent edits update `modified:` only.
 
 ---
 
@@ -280,6 +283,26 @@ If the target .md already exists, do not overwrite it. Use the Phase 5 de-duplic
 
 ---
 
+## Phase 7: DE-DUPLICATE (BATCH CONFIRMATION)
+
+When ingesting multiple files, de-duplication decisions (from Phase 5) can add up. To reduce interruption:
+
+```
+1. Collect ALL de-duplication decisions across all units from all source files
+2. Present them as a single batch:
+   "以下 [N] 个笔记与已有内容可能重复:
+    1. 「<concept>」 — 已有同名笔记 (120字)。追加/副本/跳过？
+    2. 「<method>」 — 已有相似笔记 [[<similar-note>]] (80字)。追加/副本/跳过？
+    ...
+   请逐项选择，或输入 'all-append' / 'all-skip'。"
+3. If user says 'all-append' → append all with provenance headings
+4. If user says 'all-skip' → skip all duplicates
+5. Otherwise, process each decision individually
+6. For a single file or few units, present decisions inline as before (Phase 5)
+```
+
+---
+
 ## Phase 8: REPORT
 
 ```
@@ -296,6 +319,43 @@ Output:
   已拉取补充参考: [N] 项 (列出)
   需要用户手动补充参考: [N] 篇 (列出)
 ```
+
+### Ingest Log
+
+After every ingest run, write an operation log to `<vault>/_MOCs/ingest-log-YYYY-MM-DD.md`:
+
+```markdown
+---
+tags: [type/log]
+created: YYYY-MM-DD
+---
+
+# Ingest Log — YYYY-MM-DD
+
+## 源文件
+- chat_export_0601.md → 3-Resources/Sources/2026-06-01/chat_export_0601.md
+
+## 创建笔记
+- 2-Areas/<Domain>/<concept>.md (new)
+- 2-Areas/<Domain>/<method>.md (new)
+
+## 合并到已有笔记
+- 2-Areas/<Domain>/<workflow>.md (appended from chat_export_0601.md)
+
+## 跳过
+- (none)
+
+## 更新 MOC
+- 2-Areas/<Domain>/_index.md
+
+## 拉取的补充参考
+- <citation-id> (metadata)
+
+## 待用户补充参考
+- Block-Rotation: 无可追溯来源，deepen 被阻止
+```
+
+This log enables easy rollback: delete all files listed under "创建笔记", revert MOC changes, and the vault returns to pre-ingest state.
 
 ---
 
@@ -314,9 +374,9 @@ When creating notes, use these templates (from `templates/`):
 
 | Category | Tags |
 |----------|------|
-| Note type | `#type/paper` `#type/concept` `#type/experiment` `#type/moc` `#type/daily` |
+| Note type | `#type/paper` `#type/concept` `#type/experiment` `#type/moc` `#type/daily` `#type/log` `#type/redirect` |
 | Status | `#status/draft` `#status/stub` `#status/polished` `#status/toread` `#status/archived` |
-| Area | Generated from `domains[]`: `#area/machine-learning` `#area/systems` etc. |
+| Area | Generated from `domains[]`: `#area/<domain-1>` `#area/<domain-2>` etc. |
 | Technique / Topic | Detected from content: `#technique/<name>` (kebab-case, derived from concept keywords) |
 
 ---

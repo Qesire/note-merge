@@ -2,7 +2,10 @@
 tags: [type/concept, status/polished]
 area:
 created:
+modified:
 deepened:
+source:
+source_snapshot:
 ---
 
 # {{title}}
@@ -27,14 +30,14 @@ deepened:
 
 | 文件:行号 | 作用 |
 |-----------|------|
-| `xxx.py:42` | ... |
-| `xxx.py:128` | ... |
+| `<file>:<line>` | ... |
+| `<file>:<line>` | ... |
 
-### 数学公式 → 代码映射
+### 数学公式 → 代码/实现映射
 
-| 公式 | 代码位置 |
+| 公式 | 实现位置 |
 |------|---------|
-| $f(x) = ...$ | `xxx.py:56` `def forward(...)` |
+| $f(x) = ...$ | `<file>:<line>` `<function>` |
 | | |
 
 ## 3. 设计理由
@@ -43,7 +46,7 @@ deepened:
 
 | 参数/设计选择 | 理由 | 替代方案（为什么不行） |
 |--------------|------|---------------------|
-| `block_size=32` | | |
+| `<parameter>=<value>` | | |
 | | | |
 
 ## 4. 必要性验证

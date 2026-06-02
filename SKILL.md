@@ -9,37 +9,38 @@ description: |
   Trigger on: 整理笔记, 清洗笔记, 合并笔记, 导入笔记, 深化笔记, 深挖, 检查vault,
   clean notes, merge notes, import notes, deepen notes, vault health, check vault,
   聊天记录, chat export, scratch notes, fleeting notes, 初始化vault, init vault,
-  随笔, 手记, 研究报告, 论文笔记.
+  随笔, 手记, 研究报告, 论文笔记, 归档笔记, archive notes.
   Do NOT trigger on: creating notes from scratch without source material,
   editing existing polished notes, general file operations.
-argument-hint: "ingest <files> | deepen <concept> | check"
-allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "Task", "AskUserQuestion"]
+argument-hint: "ingest <files> | deepen <concept> | check | archive <note>"
+allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "Task", "question"]
 ---
 
 # note-merge
 
-Organize raw notes into an Obsidian PARA+Zettelkasten vault. Three things you can ask me to do:
+Organize raw notes into an Obsidian PARA+Zettelkasten vault. Five actions:
 
-- **整理** `ingest <files>` — take scattered notes and absorb them into the vault
-- **深入** `deepen <concept>` — expand a stub concept note into a 5-layer analysis
-- **检查** `check` — scan the vault for broken links, missing frontmatter, stale drafts
+| Intent | Command | One-line | Load |
+|--------|---------|----------|------|
+| **整理** | `ingest <files>` | Extract knowledge units from source files, classify into vault | `references/merge-workflow.md` |
+| **深入** | `deepen <concept>` | Expand a stub/draft into 5-layer analysis (deepen --all-stubs for batch) | `references/concept-deepening.md` |
+| **检查** | `check [path]` | Scan vault for broken links, stale notes, config issues (scoped: check 2-Areas/X/) | `references/vault-check.md` |
+| **归档** | `archive <note>` | Move a completed note/project into 4-Archives/ | `references/vault-check.md` §Archive |
+| **初始化** | `init-vault` | Create vault skeleton + config | `references/vault-setup.md` |
 
-All behavior is driven by `~/KnowledgeBase/note-merge.json`. If that file does not exist, I will ask you to run `init-vault` first.
+All behavior is driven by `<vault>/note-merge.json`. If absent, prompt `init-vault`.
 
 ---
 
 ## 0. CONFIGURATION
 
-`note-merge.json` is the single source of truth. It is created during `init-vault` and read at the start of every action.
+Read `note-merge.json` before every action. Created during `init-vault`.
 
 ```json
 {
   "vault": "~/KnowledgeBase",
-  "domains": ["machine-learning", "systems", "algorithms"],
-  "source_repos": [
-    "~/MyProject",
-    "~/AnotherRepo"
-  ],
+  "domains": ["<domain-1>", "<domain-2>"],
+  "source_repos": ["~/<repo-1>"],
   "language": "zh-CN"
 }
 ```
@@ -47,210 +48,17 @@ All behavior is driven by `~/KnowledgeBase/note-merge.json`. If that file does n
 | Field | Purpose |
 |-------|---------|
 | `vault` | Path to the Obsidian vault |
-| `domains` | Research areas. Each becomes a `2-Areas/<Name>/` directory. Used to generate the classification keyword table |
+| `domains` | Research areas → `2-Areas/<Name>/` directories + classification keywords. Directory name: Title Case each word, preserve hyphens, Chinese as-is |
 | `source_repos` | Directories searched during `deepen` for source code tracing |
-| `language` | `zh-CN` → Chinese filenames preferred; `en` → kebab-case; `mixed` → per-file judgment |
+| `language` | `zh-CN` / `en` / `mixed` — controls filename and heading language |
+
+Full schema: `references/config.schema.md`.
 
 ---
 
-## 1. INGEST（整理）
+## 1–4. DETAILED WORKFLOWS
 
-```
-ingest <files...>
-```
-
-Take one or more source files and absorb their knowledge into the vault without overwriting the originals.
-
-Before extraction, preserve the raw source:
-
-1. Never edit, delete, move, or overwrite the user's original source file.
-2. If the source file is outside the vault, copy it into `3-Resources/Sources/YYYY-MM-DD/` before processing.
-3. If the source file is already inside the vault, keep it in place and treat its current path as the raw snapshot.
-4. Every created or updated note must include both `source:` and `source_snapshot:` pointing to the original or archived raw source.
-
-Processing is driven by two independent checks on the source file. They are not mutually exclusive — a file can match multiple signals in both dimensions.
-
-### 1.1 Structure check — how to extract
-
-Read the file. Detect which of these patterns are present. Apply each that matches:
-
-| Pattern | Signal | Extraction strategy |
-|---------|--------|-------------------|
-| **Q&A** | `**User**:` / `**Assistant**:` markers, timestamps, conversational turn-taking | Identify Q&A boundaries → group adjacent pairs by topic → preserve the user's questions, constraints, uncertainties, failed attempts, and decision rationale together with the answer content |
-| **Sections** | `## ` H2 headings structured as `方法` / `结果` / `实验` / `分析` / `Method` / `Results` etc. | Use H2 boundaries to split into units. Each H2 section = one candidate unit (merge adjacent short ones) |
-| **Experiment data** | Tables with numeric metrics (MSE, FID, accuracy, PSNR), config blocks (YAML/JSON), "baseline" vs "ours" comparison | Extract as experiment record. Keep the config + results table together as one unit |
-| **Code blocks** | Fenced code blocks (```) | Keep inline if illustrating a concept; extract to `3-Resources/Code-Tools/` only if it's a standalone reusable script |
-| **None of the above** | Free-form prose, no clear structure | Keep as one or a few units based on paragraph grouping. Do NOT force-split. Each unit becomes a stub/draft |
-
-A file can match multiple patterns (e.g., Q&A with embedded code blocks, or sections containing experiment tables). Apply each matched strategy in order, deduplicating overlap. Deduplication means avoiding duplicate extracted notes, not deleting raw material or removing reasoning context.
-
-### 1.1a Reasoning-context preservation
-
-When extracting, preserve the original thinking path whenever it appears. Do not strip any of these as "filler":
-
-- User questions and why the question was asked
-- Constraints, assumptions, preferences, and rejected options
-- Uncertainty, TODOs, hypotheses, failed attempts, and negative results
-- Step-by-step reasoning, decision rationale, trade-off discussion
-- Corrections, reversals, and contradictions between sources
-
-If unsure whether something is filler or reasoning context, keep it. Put preserved context under sections like `## 原始问题`, `## 约束与上下文`, `## 推理脉络`, `## 未确定点`, or `## 失败尝试`.
-
-### 1.2 Reference check — what can be traced
-
-After extraction, check whether the source file contains traceable external references. This determines what happens during `deepen` later, and whether to offer pulling additional material now.
-
-| Signal | Example | Action during ingest |
-|--------|---------|---------------------|
-| **arxiv / DOI / URL** | `arXiv:2405.xxxxx`, `https://...`, `doi:...` | "这篇笔记引用了 [citation]，需要我拉取原文/元数据吗？" If user agrees, fetch and integrate. If not, annotate the note with the citation in `## 来源` |
-| **repo / file path** | `~/MyProject/impl.py`, `core_module.py` | "引用了 [path]，需要我读取代码吗？" If user agrees, read and incorporate relevant snippets into the note body |
-| **experiment name / evidence** | `run_benchmark.sh`, `results.json`, `experiment_log.txt` | "提到了 [name]，需要我查找相关数据吗？" If user agrees, search for the file and its output |
-| **none** | No arxiv, no path, no URL, no specific file reference | Skip reference pull. The note goes in as draft/stub. Deepen will be BLOCKED unless user later provides references |
-
-A file can have references even if it's free-form (e.g., a casual note that mentions an arxiv ID). A file can lack references even if structured (e.g., lecture notes without citations). The two checks are independent.
-
-### 1.3 Classification: match-first
-
-For each extracted knowledge unit, classify into the vault by matching before guessing:
-
-```
-Step 1 — EXACT TITLE MATCH
-  Search vault for an existing .md with the same title → if found, this unit
-  belongs to that note's directory and should be merged/de-duplicated.
-
-Step 2 — CONTEXT MATCH
-  Extract all [[wikilinks]], project names, paper references from the unit.
-  Search vault for those references.
-  If found → place this unit in the same directory / adjacent to the matched note.
-  Example: unit mentions [[MyConcept]] which lives in 2-Areas/Machine-Learning/
-           → this unit also goes to 2-Areas/Machine-Learning/
-
-Step 3 — KEYWORD FALLBACK
-  Only when Steps 1-2 yield nothing.
-  Use the domain list from note-merge.json to build a keyword→directory mapping.
-  Each domain name becomes both a keyword AND a target directory.
-  Additional keywords for each PARA slot:
-
-  | Keywords | Target |
-  |----------|--------|
-  | 论文, paper, arxiv | 3-Resources/Papers/<topic>/ |
-  | 实验, 测试, experiment, 结果 | 1-Projects/<project>/experiments/ |
-  | 方法, 算法, method, algorithm | 1-Projects/<project>/methods/ |
-  | 教程, 学习, tutorial, guide | 3-Resources/Tutorials/ |
-  | 代码, 工具, script, tool | 3-Resources/Code-Tools/ |
-  | 讲座, PPT, slides, presentation | 3-Resources/Presentations/ |
-  | 日记, 反思, 计划, todo | 0-Inbox/daily/ |
-
-Step 4 — AMBIGUITY RESOLUTION
-  If multiple candidates remain → ask user: "放在 A 还是 B？"
-  If zero candidates → place in 0-Inbox/fleeting/, report: "无法自动分类"
-```
-
-### 1.4 De-duplication
-
-After classification, check if a similar note already exists at the target path:
-
-- Exact same title? → Ask user: append / create-versioned-copy / skip. Never replace or overwrite.
-- Similar topic (same concept, different phrasing)? → Show both titles + first 100 chars, ask user
-- No match → create new note
-
-No decision matrix needed — just ask the user. "Merge" means append with provenance and preserve both versions' reasoning context; it never means destructive replacement.
-
-### 1.5 Output format
-
-Every created note must have:
-
-```markdown
----
-tags: [type/..., area/..., status/draft]
-created: YYYY-MM-DD
-source: <original file name>
-source_snapshot: <vault-relative raw source path>
----
-```
-
-Internal links use `[[wikilinks]]`. Chinese filenames for Chinese content; kebab-case for English.
-
----
-
-## 2. DEEPEN（深入）
-
-```
-deepen <concept-note>
-```
-
-Expand a stub or draft concept note using the 5-layer framework. Load `references/concept-deepening.md` for full instructions.
-
-### 2.1 Reference threshold (REQUIRED before deepening)
-
-Check whether the note has traceable references. This is independent of how the note was originally ingested — the check is on the note's current state.
-
-| The note has... | Action |
-|----------------|--------|
-| Frontmatter `source:` pointing to a paper (arxiv/DOI/title) | ✅ Allow — paper content is traceable reference |
-| Frontmatter `source:` pointing to code (repo path / file path) | ✅ Allow — code is traceable reference |
-| References to specific experiment scripts or output logs | ✅ Allow — experiments are traceable evidence |
-| `[[wikilinks]]` to existing polished notes | ✅ Allow — those notes provide traceable context |
-| `## 来源` section with concrete, findable references | ✅ Allow |
-| None of the above — only the note's own text | ❌ Block — reply: "这篇笔记缺乏可追溯的参考材料（论文、代码、实验数据），无法深化。请提供至少一项外部来源。" |
-
-If the note has references that are mentioned but not yet accessible (arxiv ID not fetched, repo not read), fetch/read them first before beginning the 5-layer analysis.
-
-### 2.2 Source tracing
-
-Search for code in `source_repos` from `note-merge.json`. Read relevant files. Find experiment outputs.
-
-### 2.3 Quality gate
-
-All 5 layers must pass the sufficiency thresholds defined in `references/concept-deepening.md` (Quality Gate). If any layer fails, keep `status/draft` and list what's missing.
-
----
-
-## 3. CHECK（检查）
-
-```
-check
-```
-
-Scan the vault. Report all issues. Do not auto-fix unless user says "fix it."
-
-| Check | What to look for |
-|-------|-----------------|
-| Broken wikilinks | `[[links]]` whose target .md does not exist. Sort by how many notes reference the broken target (high-traffic stubs first) |
-| Stub notes | Notes with `#status/stub` — these need `deepen` |
-| Orphan notes | Notes with 0 incoming wikilinks |
-| Stale drafts | Draft notes with no modification in >30 days |
-| Missing frontmatter | Notes without `tags:` or `created:` |
-| Inconsistent status | Deepened-format notes still tagged `draft` |
-| Config health | `source_repos` paths exist? `domains` directories exist? |
-
-Output as a priority-ordered list. Broken wikilinks affecting many notes come first.
-
----
-
-## 4. INIT-VAULT
-
-```
-init-vault
-```
-
-Create a new Obsidian vault. This is an interactive, one-time setup:
-
-```
-1. Ask: "Vault path?" [default ~/KnowledgeBase]
-2. Ask: "Research domains? (comma-separated)"
-   → Stores in note-merge.json as domains[]
-   → Creates 2-Areas/<Each>/ directories with _index.md
-3. Ask: "Source code repositories? (paths, comma-separated)"
-   → Stores in source_repos[] for deepen tracing
-4. Ask: "Primary language? [zh-CN / en / mixed]"
-5. Create vault directory structure (PARA skeleton)
-6. Write .obsidian/ config files
-7. Write note-merge.json
-8. Copy templates from templates/ into _templates/
-```
-
-Load `references/vault-setup.md` for the directory skeleton and Obsidian config details.
+Each action's full specification lives in its reference file (see table above). SKILL.md only provides the dispatch. Key invariants are listed below as Hard Rules.
 
 ---
 
@@ -266,9 +74,10 @@ Load `references/vault-setup.md` for the directory skeleton and Obsidian config 
 | 6 | Notes without traceable references (paper, code, experiment) CANNOT be deepened — ask user to provide sources |
 | 7 | Classify by matching vault content first, keywords second |
 | 8 | Ask user when ambiguous — do not guess |
-| 9 | Every .md must have frontmatter with `tags:`, `created:`, `source:`, and `source_snapshot:` when created from ingest |
+| 9 | Every .md must have frontmatter with `tags:`, `created:`, `modified:`, `source:`, and `source_snapshot:` when created from ingest |
 | 10 | Internal links → `[[wikilinks]]`, never `[text](path.md)` |
 | 11 | Chinese content → Chinese filename; English → kebab-case |
+| 12 | Every ingest run generates an `ingest-log-YYYY-MM-DD.md` in `_MOCs/` listing all created/updated/skipped files |
 
 ---
 
@@ -278,6 +87,7 @@ Load `references/vault-setup.md` for the directory skeleton and Obsidian config 
 |--------|------|
 | `ingest` | `references/merge-workflow.md` |
 | `deepen` | `references/concept-deepening.md` |
-| `check` | `references/edge-cases.md` |
+| `check` / `archive` | `references/vault-check.md` |
 | `init-vault` | `references/vault-setup.md` |
-| Any action encountering unexpected input | `references/edge-cases.md` |
+| Unexpected input | `references/edge-cases.md` |
+| Config validation | `references/config.schema.md` |

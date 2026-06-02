@@ -30,11 +30,22 @@ Research domains. Each domain name:
 2. Is added to the keyword→directory mapping for classification (ingest Phase 3)
 3. Creates `#area/<kebab-name>` tags in the tag taxonomy
 
+**Directory naming rules:**
+
+| Domain value | Directory name | Tag |
+|-------------|----------------|-----|
+| `ecology` | `Ecology` | `#area/ecology` |
+| `urban-planning` | `Urban-Planning` | `#area/urban-planning` |
+| `机器学习` | `机器学习` | `#area/机器学习` |
+| `early-modern-history` | `Early-Modern-History` | `#area/early-modern-history` |
+
+Rules: Title Case each word (first letter uppercase, rest lowercase), preserve hyphens, Chinese characters as-is.
+
 ```json
-"domains": ["quantization", "diffusion", "low-level-vision"]
+"domains": ["ecology", "genomics", "urban-planning"]
 ```
 
-This generates directories: `2-Areas/Quantization/`, `2-Areas/Diffusion-Models/`, `2-Areas/Low-Level-Vision/`
+This generates directories: `2-Areas/Ecology/`, `2-Areas/Genomics/`, `2-Areas/Urban-Planning/`
 
 ### `source_repos`
 
@@ -46,9 +57,9 @@ Directories searched during `deepen` for source code tracing. Each path must exi
 
 ```json
 "source_repos": [
-  "~/TinyFusion",
-  "~/DiTQuantValidation",
-  "~/wan-quantization-study/ViDiT-Q"
+  "~/<repo-1>",
+  "~/<repo-2>",
+  "~/<repo-3>/<subproject>"
 ]
 ```
 
@@ -75,12 +86,12 @@ Controls filename convention and section heading language:
 ```json
 {
   "vault": "~/KnowledgeBase",
-  "domains": ["quantization", "diffusion", "low-level-vision", "model-compression"],
+  "domains": ["ecology", "genomics", "urban-planning", "early-modern-history"],
   "source_repos": [
-    "~/TinyFusion",
-    "~/DiTQuantValidation",
-    "~/PTQ4DiT",
-    "~/wan-quantization-study"
+    "~/<repo-1>",
+    "~/<repo-2>",
+    "~/<repo-3>",
+    "~/<repo-4>"
   ],
   "language": "zh-CN"
 }

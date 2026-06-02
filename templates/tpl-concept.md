@@ -1,6 +1,10 @@
 ---
-tags: [type/concept]
+tags: [type/concept, status/draft]
 area:
+created:
+modified:
+source:
+source_snapshot:
 ---
 
 # {{title}}
