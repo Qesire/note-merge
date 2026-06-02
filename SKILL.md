@@ -3,7 +3,7 @@ name: note-merge
 description: |
   Organize raw notes into an Obsidian vault, deepen concept notes through source tracing,
   and diagnose vault health — all driven by a local config file (note-merge.json).
-  Three user intents: ingest scattered notes, deepen stub concepts, check vault health.
+  Five user intents: ingest scattered notes, deepen stub concepts, check vault health, archive completed notes, initialize vault.
   Internal logic uses two independent checks: structure (how to extract content from a file)
   and reference (whether the note has traceable external sources for deepening).
   Trigger on: 整理笔记, 清洗笔记, 合并笔记, 导入笔记, 深化笔记, 深挖, 检查vault,
@@ -74,7 +74,7 @@ Each action's full specification lives in its reference file (see table above). 
 | 6 | Notes without traceable references (paper, code, experiment) CANNOT be deepened — ask user to provide sources |
 | 7 | Classify by matching vault content first, keywords second |
 | 8 | Ask user when ambiguous — do not guess |
-| 9 | Every .md must have frontmatter with `tags:`, `created:`, `modified:`, `source:`, and `source_snapshot:` when created from ingest |
+| 9 | Every .md must have frontmatter with `tags:`, `created:`, `modified:`, `source:`, and `source_snapshot:` when created from ingest. Deepened notes must also have `deepened:` |
 | 10 | Internal links → `[[wikilinks]]`, never `[text](path.md)` |
 | 11 | Chinese content → Chinese filename; English → kebab-case |
 | 12 | Every ingest run generates an `ingest-log-YYYY-MM-DD.md` in `_MOCs/` listing all created/updated/skipped files |

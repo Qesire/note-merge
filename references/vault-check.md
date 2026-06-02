@@ -75,7 +75,7 @@ Stub 笔记: 12 篇，可考虑 deepen
 **Report:**
 ```
 过期 draft: 3 篇，超过 30 天未修改
-  - [[Old-Experiment]] (modified: 2026-04-01, 62天)
+  - [[<old-note>]] (modified: 2026-04-01, 62天)
   - ...
 ```
 
@@ -123,8 +123,8 @@ Frontmatter 缺失: 2 篇
 **Report:**
 ```
 状态不一致: 2 篇
-  - [[Deep-Note-Still-Draft]]: 有5层结构但标签为 draft
-  - [[Shallow-Polished]]: 标签为 polished 但无5层结构
+  - [[<deep-note>]]: 有5层结构但标签为 draft
+  - [[<shallow-note>]]: 标签为 polished 但无5层结构
 ```
 
 **Priority:** Low.

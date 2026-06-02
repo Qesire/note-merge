@@ -36,7 +36,7 @@ The extracted note is a derivative working note, not a replacement for the sourc
 
 Read each source file. Run two independent checks. They answer different questions and both must be performed.
 
-### 1.1 Structure check — how to extract
+### 2.1 Structure check — how to extract
 
 Detect which organizational patterns are present in the file. A file can match zero, one, or multiple patterns.
 
@@ -50,7 +50,7 @@ Detect which organizational patterns are present in the file. A file can match z
 
 Apply all matched strategies. If strategies produce overlapping units (e.g., a Q&A pair that also contains an experiment table), merge the overlap in the derivative notes only. Never remove content from the raw source snapshot.
 
-### 2.1 Reasoning-context check — what must be preserved
+### 2.2 Reasoning-context check — what must be preserved
 
 During extraction, explicitly scan for thinking-process signals and preserve them in the derived note:
 
@@ -65,7 +65,7 @@ During extraction, explicitly scan for thinking-process signals and preserve the
 
 Do not classify these as filler. If unsure whether a passage is filler or reasoning context, keep it.
 
-### 1.2 Reference check — what is traceable
+### 2.3 Reference check — what is traceable
 
 Check whether the source file contains references to external, findable material. This affects:
 - Whether to offer pulling additional sources during ingest
@@ -283,7 +283,7 @@ If the target .md already exists, do not overwrite it. Use the Phase 5 de-duplic
 
 ---
 
-## Phase 7: DE-DUPLICATE (BATCH CONFIRMATION)
+## Phase 8: DE-DUPLICATE (BATCH CONFIRMATION)
 
 When ingesting multiple files, de-duplication decisions (from Phase 5) can add up. To reduce interruption:
 
@@ -303,7 +303,7 @@ When ingesting multiple files, de-duplication decisions (from Phase 5) can add u
 
 ---
 
-## Phase 8: REPORT
+## Phase 9: REPORT
 
 ```
 Output:
@@ -352,7 +352,7 @@ created: YYYY-MM-DD
 - <citation-id> (metadata)
 
 ## 待用户补充参考
-- Block-Rotation: 无可追溯来源，deepen 被阻止
+- <method>: 无可追溯来源，deepen 被阻止
 ```
 
 This log enables easy rollback: delete all files listed under "创建笔记", revert MOC changes, and the vault returns to pre-ingest state.

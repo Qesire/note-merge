@@ -11,10 +11,10 @@ source_snapshot:
 ## 目标
 -
 
-## 仓库
+## 仓库/来源
 - 本地路径:
-- 远程:
-- Codebase: [[Codebase]]
+- 远程/来源:
+- 核心材料: [[Codebase]]
 
 ## 关键笔记
 ### 方法
