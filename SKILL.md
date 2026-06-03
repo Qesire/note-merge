@@ -4,16 +4,20 @@ description: |
   Organize raw notes into an Obsidian vault, deepen concept notes through source tracing,
   and diagnose vault health — all driven by a local config file (note-merge.json).
   Five user intents: ingest scattered notes, deepen stub concepts, check vault health, archive completed notes, initialize vault.
-  Internal logic uses two independent checks: structure (how to extract content from a file)
-  and reference (whether the note has traceable external sources for deepening).
+  Internal logic uses three independent checks: structure (how to extract from a file),
+  reasoning-context (what thinking process to preserve), and reference (whether the note
+  has traceable external sources for deepening).
   Trigger on: 整理笔记, 清洗笔记, 合并笔记, 导入笔记, 深化笔记, 深挖, 检查vault,
   clean notes, merge notes, import notes, deepen notes, vault health, check vault,
   聊天记录, chat export, scratch notes, fleeting notes, 初始化vault, init vault,
   随笔, 手记, 研究报告, 论文笔记, 归档笔记, archive notes.
   Do NOT trigger on: creating notes from scratch without source material,
   editing existing polished notes, general file operations.
-argument-hint: "ingest <files> | deepen <concept> | check | archive <note>"
+license: MIT
+compatibility: opencode
+# The following are Claude Code fields; silently ignored by OpenCode:
 allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "Task", "question"]
+argument-hint: "ingest <files> | deepen <concept> | check | archive <note>"
 ---
 
 # note-merge
